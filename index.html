@@ -1559,6 +1559,7 @@ document.addEventListener('visibilitychange', () => {
 // INIT
 // ─────────────────────────────────────────
 async function initApp(session) {
+  if (isRecoveryMode) return; // recovery 模式不初始化 app
   if (!session) {
     document.getElementById('authScreen').style.display = 'flex';
     return;
@@ -1588,7 +1589,7 @@ async function initApp(session) {
 }
 
 sb.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_IN') initApp(session);
+  if (event === 'SIGNED_IN' && !isRecoveryMode) initApp(session);
   if (event === 'PASSWORD_RECOVERY') {
     // 顯示重設密碼介面
     document.getElementById('authScreen').style.display = 'flex';
@@ -1636,6 +1637,8 @@ sb.auth.getSession().then(({ data: { session } }) => {
 });
 
 // 處理從信箱連結跳回來的情況（忘記密碼）
+let isRecoveryMode = false;
+
 function showResetPasswordUI() {
   document.getElementById('authScreen').style.display = 'flex';
   document.getElementById('authSubtitle').textContent = '請設定新密碼';
@@ -1673,9 +1676,11 @@ if (window.location.hash && window.location.hash.includes('type=recovery')) {
   const accessToken = hashParams.get('access_token');
   const refreshToken = hashParams.get('refresh_token') || '';
   if (accessToken) {
+    isRecoveryMode = true;
     sb.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
       .then(({ error }) => {
         if (!error) showResetPasswordUI();
+        else { isRecoveryMode = false; }
       });
   } else {
     showResetPasswordUI();
