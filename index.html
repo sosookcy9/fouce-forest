@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>專注森林</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* ── Google Fonts ── */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600&family=DM+Mono:wght@300;400&display=swap');
@@ -34,6 +35,42 @@ body{
   color:var(--green-deep);
 }
 
+/* ══ AUTH SCREEN ══ */
+#authScreen{
+  position:fixed;inset:0;z-index:1000;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px 24px;
+}
+.auth-box{width:100%;max-width:360px;background:var(--surface);border-radius:var(--radius-md);padding:28px 24px;box-shadow:var(--shadow-md);}
+.auth-logo{font-size:2.5rem;text-align:center;margin-bottom:6px;}
+.auth-title{font-size:1.1rem;font-weight:600;color:var(--green-deep);text-align:center;margin-bottom:4px;}
+.auth-sub{font-size:.76rem;color:var(--green-mid);text-align:center;margin-bottom:24px;}
+.auth-input{
+  width:100%;padding:10px 14px;border-radius:var(--radius-sm);
+  border:1.5px solid var(--green-pale);font-family:'Noto Serif TC',serif;
+  font-size:.88rem;color:var(--green-deep);outline:none;margin-bottom:10px;
+  background:#fff;box-sizing:border-box;
+}
+.auth-input:focus{border-color:var(--green-mid);}
+.auth-btn{
+  width:100%;padding:11px;border:none;border-radius:var(--radius-pill);
+  background:var(--green-deep);color:#fff;font-family:'Noto Serif TC',serif;
+  font-size:.9rem;cursor:pointer;margin-bottom:8px;transition:background .2s;
+}
+.auth-btn:hover{background:var(--green-mid);}
+.auth-toggle{font-size:.76rem;color:var(--green-mid);text-align:center;cursor:pointer;text-decoration:underline;}
+.auth-msg{font-size:.74rem;text-align:center;margin-top:8px;min-height:18px;color:var(--red);}
+.auth-msg.ok{color:var(--green-mid);}
+.user-bar{
+  display:flex;align-items:center;gap:6px;
+  font-size:.7rem;color:var(--green-mid);
+}
+.logout-btn{
+  padding:4px 10px;border-radius:var(--radius-pill);border:1.5px solid var(--green-pale);
+  background:transparent;font-family:'Noto Serif TC',serif;font-size:.68rem;
+  color:var(--green-mid);cursor:pointer;
+}
 /* ══ NAV ══ */
 nav{
   width:100%;display:flex;justify-content:space-between;align-items:center;
@@ -323,12 +360,29 @@ nav{
 </head>
 <body>
 
+<!-- ══ AUTH ══ -->
+<div id="authScreen">
+  <div class="auth-box">
+    <div class="auth-logo">🌿</div>
+    <div class="auth-title">專注森林</div>
+    <div class="auth-sub" id="authSubtitle">登入以同步你的森林紀錄</div>
+    <input class="auth-input" type="email" id="authEmail" placeholder="電子郵件">
+    <input class="auth-input" type="password" id="authPassword" placeholder="密碼（至少6位）">
+    <button class="auth-btn" onclick="authSubmit()">登入</button>
+    <div class="auth-toggle" onclick="toggleAuthMode()" id="authToggle">還沒有帳號？點此註冊</div>
+    <div class="auth-msg" id="authMsg"></div>
+  </div>
+</div>
+
 <nav>
   <div class="logo">🌿 專注森林</div>
-  <div class="nav-tabs">
-    <button class="nav-tab active" onclick="go('timer')">種樹</button>
-    <button class="nav-tab" onclick="go('garden')">花園</button>
-    <button class="nav-tab" onclick="go('stats')">統計</button>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="go('timer')">種樹</button>
+      <button class="nav-tab" onclick="go('garden')">花園</button>
+      <button class="nav-tab" onclick="go('stats')">統計</button>
+    </div>
+    <button class="logout-btn" onclick="logout()">登出</button>
   </div>
 </nav>
 
@@ -452,9 +506,63 @@ const TREES = [
 ];
 
 // ─────────────────────────────────────────
+// SUPABASE
+// ─────────────────────────────────────────
+const SUPABASE_URL = 'https://zzweljfdxxbifcyjycvi.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6d2VsamZkeHhiaWZjeWp5Y3ZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNDY0MDEsImV4cCI6MjA5MTkyMjQwMX0.y30N5GbVVJfKW00NgLSp6_ZP1f473SBb5W7_l8ZIBcE';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+
+// ─────────────────────────────────────────
+// AUTH UI
+// ─────────────────────────────────────────
+let authMode = 'login'; // 'login' | 'signup'
+
+function toggleAuthMode() {
+  authMode = authMode === 'login' ? 'signup' : 'login';
+  document.getElementById('authToggle').textContent =
+    authMode === 'login' ? '還沒有帳號？點此註冊' : '已有帳號？點此登入';
+  document.querySelector('.auth-btn').textContent =
+    authMode === 'login' ? '登入' : '註冊';
+  document.getElementById('authSubtitle').textContent =
+    authMode === 'login' ? '登入以同步你的森林紀錄' : '建立帳號，開始種樹吧！';
+  document.getElementById('authMsg').textContent = '';
+}
+
+async function authSubmit() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const msg = document.getElementById('authMsg');
+  msg.textContent = '處理中...';
+  msg.className = 'auth-msg ok';
+
+  if (!email || !password) { msg.className='auth-msg'; msg.textContent='請填寫Email和密碼'; return; }
+
+  if (authMode === 'login') {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) { msg.className='auth-msg'; msg.textContent='登入失敗：' + (error.message.includes('Invalid') ? '帳號或密碼錯誤' : error.message); }
+  } else {
+    const { error } = await sb.auth.signUp({ email, password });
+    if (error) { msg.className='auth-msg'; msg.textContent='註冊失敗：' + error.message; }
+    else { msg.className='auth-msg ok'; msg.textContent='✅ 註冊成功！請查收確認信再登入'; authMode='login'; }
+  }
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  currentUser = null;
+  garden = [];
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('authEmail').value = '';
+  document.getElementById('authPassword').value = '';
+  document.getElementById('authMsg').textContent = '';
+}
+
+// ─────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────
-let garden    = JSON.parse(localStorage.getItem('fg_garden2') || '[]');
+let garden    = [];
 let selTree   = TREES[0];
 let isRunning = false;
 let timeLeft  = 0, totalTime = 0;
@@ -654,7 +762,7 @@ function finishFocus() {
     mins: Math.round(totalTime/60),
     date: todayStr(), dead: false
   };
-  garden.push(entry); save();
+  garden.push(entry); save(); saveToSupabase(entry);
 
   for(let i=0;i<10;i++) setTimeout(()=>spawnParticle(['🌸','🌺','🍀','✨','🌿'][Math.floor(Math.random()*5)]),i*100);
 
@@ -708,7 +816,7 @@ function giveUp() {
     });}
     const entry={tree:selTree.id,emoji:selTree.emoji,name:selTree.name,
       mins:Math.round((totalTime-timeLeft)/60)||0,date:todayStr(),dead:true};
-    garden.push(entry); save();
+    garden.push(entry); save(); saveToSupabase(entry);
     setTimeout(resetUI,1900);
   };
 }
@@ -936,6 +1044,31 @@ function todayStr(){ return dateStr(new Date()); }
 function dateStr(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function save(){ localStorage.setItem('fg_garden2',JSON.stringify(garden)); }
 
+async function saveToSupabase(entry) {
+  if (!currentUser) return;
+  await sb.from('garden').insert({
+    user_id: currentUser.id,
+    tree: entry.tree,
+    emoji: entry.emoji,
+    name: entry.name,
+    mins: entry.mins,
+    date: entry.date,
+    dead: entry.dead
+  });
+}
+
+async function loadFromSupabase() {
+  if (!currentUser) return;
+  const { data, error } = await sb.from('garden').select('*').order('created_at');
+  if (!error && data) {
+    garden = data.map(r => ({
+      tree: r.tree, emoji: r.emoji, name: r.name,
+      mins: r.mins, date: r.date, dead: r.dead
+    }));
+    save();
+  }
+}
+
 // ─────────────────────────────────────────
 // WAKE LOCK  &  NOTIFICATIONS
 // ─────────────────────────────────────────
@@ -970,18 +1103,35 @@ document.addEventListener('visibilitychange', () => {
 // ─────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────
-// ── Migrate old localStorage entries that are missing name/emoji ──
-garden = garden.map(e => {
-  if (!e.name || !e.emoji) {
-    const tDef = TREES.find(x => x.id === e.tree);
-    if (tDef) {
-      e.name  = e.name  || tDef.name;
-      e.emoji = e.emoji || tDef.emoji;
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (session) {
+    currentUser = session.user;
+    document.getElementById('authScreen').style.display = 'none';
+    await loadFromSupabase();
+    // migrate local data if any
+    const local = JSON.parse(localStorage.getItem('fg_garden2') || '[]');
+    if (local.length > 0 && garden.length === 0) {
+      for (const entry of local) { await saveToSupabase(entry); }
+      await loadFromSupabase();
+      localStorage.removeItem('fg_garden2');
     }
+    garden = garden.map(e => {
+      if (!e.name || !e.emoji) {
+        const tDef = TREES.find(x => x.id === e.tree);
+        if (tDef) { e.name = e.name || tDef.name; e.emoji = e.emoji || tDef.emoji; }
+      }
+      return e;
+    });
+    buildPicker();
+    setEmojiStage(0, false);
+    updateDisplay();
+    renderGarden();
+    renderStats();
+  } else {
+    currentUser = null;
+    document.getElementById('authScreen').style.display = 'flex';
   }
-  return e;
 });
-save(); // write back migrated data
 
 buildPicker();
 
