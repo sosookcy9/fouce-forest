@@ -231,22 +231,7 @@ nav{
 .fav-cnt{font-size:.66rem;color:var(--green-mid);}
 .fav-mins{font-size:.66rem;color:var(--green-light);}
 
-/* Backup row */
-.backup-row{
-  width:100%;display:flex;align-items:center;justify-content:space-between;
-  background:var(--surface);border-radius:var(--radius-md);
-  padding:12px 16px;margin-bottom:12px;
-  box-shadow:var(--shadow-sm);
-}
-.backup-hint{font-size:.72rem;color:var(--green-mid);}
-.backup-btns{display:flex;gap:8px;}
-.backup-btn{
-  padding:6px 14px;border-radius:var(--radius-pill);border:1.5px solid var(--green-pale);
-  background:var(--surface2);font-family:'Noto Serif TC',serif;
-  font-size:.72rem;color:var(--green-mid);cursor:pointer;transition:all .2s;
-  display:inline-flex;align-items:center;gap:4px;
-}
-.backup-btn:hover{background:#fff;border-color:var(--green-light);}
+
 
 /* ══ Overlay ══ */
 .overlay{
@@ -420,16 +405,7 @@ nav{
     <div class="fav-tree-cards" id="rankList"></div>
   </div>
 
-  <div class="backup-row">
-    <span class="backup-hint">換手機前先備份紀錄</span>
-    <div class="backup-btns">
-      <button class="backup-btn" onclick="exportData()">📤 匯出</button>
-      <label class="backup-btn">
-        📥 匯入
-        <input type="file" accept=".json" onchange="importData(event)" style="display:none;">
-      </label>
-    </div>
-  </div>
+
 
 </div>
 
@@ -959,55 +935,6 @@ function spawnParticle(emoji) {
 function todayStr(){ return dateStr(new Date()); }
 function dateStr(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function save(){ localStorage.setItem('fg_garden2',JSON.stringify(garden)); }
-
-// ─────────────────────────────────────────
-// EXPORT / IMPORT
-// ─────────────────────────────────────────
-function exportData() {
-  const data = {
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    garden: garden
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `專注森林_${todayStr()}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function importData(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      // Support both raw array and wrapped object
-      const imported = Array.isArray(data) ? data : (data.garden || []);
-      if (!Array.isArray(imported)) throw new Error('格式錯誤');
-
-      const existing = garden.length;
-      // Merge: avoid duplicates by date+tree+mins combo
-      const keys = new Set(garden.map(t=>`${t.date}-${t.tree}-${t.mins}`));
-      let added = 0;
-      imported.forEach(entry => {
-        const k = `${entry.date}-${entry.tree}-${entry.mins}`;
-        if (!keys.has(k)) { garden.push(entry); keys.add(k); added++; }
-      });
-      save();
-      alert(`✅ 匯入成功！新增 ${added} 筆紀錄`);
-      renderStats();
-    } catch(err) {
-      alert('❌ 匯入失敗，請確認檔案是否正確');
-    }
-  };
-  reader.readAsText(file);
-  // Reset input so same file can be re-imported if needed
-  event.target.value = '';
-}
 
 // ─────────────────────────────────────────
 // WAKE LOCK  &  NOTIFICATIONS
