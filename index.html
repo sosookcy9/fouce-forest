@@ -492,6 +492,7 @@ let timeLeft  = 0, totalTime = 0;
 let timerId   = null;
 let curMode   = 'custom';
 const CIRC    = 2 * Math.PI * 115; // ~722.6
+let wakeLock  = null;
 
 // ─────────────────────────────────────────
 // NAV
@@ -521,7 +522,7 @@ function buildPicker() {
       selTree = t;
       document.querySelectorAll('.picker-item').forEach(x=>x.classList.remove('selected'));
       d.classList.add('selected');
-      applyTreeClass(document.getElementById('treeCanvas'), t.cls, 'stage-0');
+      setEmojiStage(0, false);
     };
     wrap.appendChild(d);
   });
@@ -656,6 +657,7 @@ function startFocus() {
   void el.offsetWidth;
   el.classList.add('tree-breathing');
   timerId = setInterval(tick, 1000);
+  requestWakeLock();
 }
 
 function tick() {
@@ -684,12 +686,19 @@ function setRing(ratio) {
 
 function finishFocus() {
   clearInterval(timerId); isRunning=false;
+  releaseWakeLock();
   const tEl = document.getElementById('treeEmojiDisplay');
   if(tEl){ tEl.classList.remove('tree-breathing'); }
   setEmojiStage(4);
   if(tEl){ void tEl.offsetWidth; tEl.classList.add('tree-boom'); }
   // Petal burst
   burstPetals();
+  // Push notification
+  sendNotification(
+    '🌸 專注完成！',
+    `${selTree.name}已成功種進你的森林 — 你太棒了！`,
+    selTree.bloomEmoji
+  );
 
   const entry = {
     tree: selTree.id, emoji: selTree.emoji, name: selTree.name,
@@ -714,6 +723,7 @@ function dismissOverlay() {
 function giveUp() {
   if(!confirm('確定放棄？樹會枯死喔 🥀')) return;
   clearInterval(timerId); isRunning=false;
+  releaseWakeLock();
   const gEl = document.getElementById('treeEmojiDisplay');
   if(gEl) gEl.classList.remove('tree-breathing');
   setDeadStage();
@@ -722,16 +732,17 @@ function giveUp() {
   document.getElementById('statusMsg').className='status-msg fail';
   document.getElementById('statusMsg').textContent='哎呀…樹枯死了 🥀';
 
-  // fall leaves
-  const c = document.getElementById('treeCanvas');
-  ['🍂','🍁','🍂'].forEach((l,i)=>{
+  // fall leaves around the emoji
+  const c = document.getElementById('treeEmojiDisplay');
+  if(c){['🍂','🍁','🍂'].forEach((l,i)=>{
     const el=document.createElement('span');
     el.className='fall-leaf';
     el.textContent=l;
-    el.style.cssText=`--dx:${(Math.random()-.5)*50}px;--dr:${(Math.random()-.5)*80}deg;top:20%;left:${25+i*20}%;font-size:14px;`;
+    el.style.cssText=`--dx:${(Math.random()-.5)*50}px;--dr:${(Math.random()-.5)*80}deg;top:10%;left:${20+i*25}%;font-size:14px;position:absolute;`;
+    c.style.position='relative';
     c.appendChild(el);
     setTimeout(()=>el.remove(),1600);
-  });
+  });}
 
   const entry={tree:selTree.id,emoji:selTree.emoji,name:selTree.name,
     mins:Math.round((totalTime-timeLeft)/60)||0,date:todayStr(),dead:true};
@@ -1011,6 +1022,40 @@ function importData(event) {
 }
 
 // ─────────────────────────────────────────
+// WAKE LOCK  &  NOTIFICATIONS
+// ─────────────────────────────────────────
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch(e) { /* silently ignore if denied */ }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+}
+
+// Re-acquire wake lock if page becomes visible again (iOS releases it on hide)
+document.addEventListener('visibilitychange', () => {
+  if (isRunning && document.visibilityState === 'visible') requestWakeLock();
+});
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+}
+
+function sendNotification(title, body, emoji) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    new Notification(title, { body, icon: '', badge: '' ,silent: false });
+  } catch(e) {}
+}
+
+// ─────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────
 // ── Migrate old localStorage entries that are missing name/emoji ──
@@ -1040,6 +1085,9 @@ buildPicker();
 })();
 setEmojiStage(0, false);
 updateDisplay();
+// Ask notification permission on load (browser requires user gesture first,
+// so we defer slightly and let the browser decide)
+setTimeout(requestNotificationPermission, 2000);
 </script>
 </body>
 </html>
