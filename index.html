@@ -394,6 +394,7 @@ nav{
     <button class="mode-btn" onclick="setMode(30)">30'</button>
     <button class="mode-btn" onclick="setMode(35)">35'</button>
     <button class="mode-btn" onclick="setMode(40)">40'</button>
+    <button class="mode-btn" onclick="setMode(-10)" style="font-size:.72rem;color:var(--red);border-color:rgba(193,68,14,.4);">🧪 10"</button>
   </div>
 
   <!-- Ring -->
@@ -681,14 +682,14 @@ function setMode(m) {
   if(isRunning) return;
   curMode = m;
   document.querySelectorAll('.mode-btn').forEach(b=>{
-    const val = parseInt(b.textContent);
+    const val = b.textContent.includes('10"') ? -10 : parseInt(b.textContent);
     b.classList.toggle('active', val===m);
   });
   updateDisplay();
 }
 
 function updateDisplay() {
-  showTime(curMode * 60);
+  showTime(curMode === -10 ? 10 : curMode * 60);
 }
 
 function showTime(s) {
@@ -702,7 +703,7 @@ function showTime(s) {
 // ─────────────────────────────────────────
 function startFocus() {
   const mins = curMode;
-  totalTime = mins * 60;
+  totalTime = curMode === -10 ? 10 : mins * 60;
   timeLeft  = totalTime;
   startTimestamp = Date.now();
   isRunning = true;
