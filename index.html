@@ -673,13 +673,6 @@ function finishFocus() {
   if(tEl){ void tEl.offsetWidth; tEl.classList.add('tree-boom'); }
   // Petal burst
   burstPetals();
-  // Push notification
-  sendNotification(
-    '🌸 專注完成！',
-    `${selTree.name}已成功種進你的森林 — 你太棒了！`,
-    selTree.bloomEmoji
-  );
-
   const entry = {
     tree: selTree.id, emoji: selTree.emoji, name: selTree.name,
     mins: Math.round(totalTime/60),
@@ -1045,19 +1038,7 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-async function requestNotificationPermission() {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
-    await Notification.requestPermission();
-  }
-}
 
-function sendNotification(title, body, emoji) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  try {
-    new Notification(title, { body, icon: '', badge: '' ,silent: false });
-  } catch(e) {}
-}
 
 // ─────────────────────────────────────────
 // INIT
@@ -1075,7 +1056,6 @@ garden = garden.map(e => {
 });
 save(); // write back migrated data
 
-document.getElementById('minInput') && document.getElementById('minInput').addEventListener('input', updateDisplay);
 buildPicker();
 
 // Drag-to-scroll picker
@@ -1089,9 +1069,6 @@ buildPicker();
 })();
 setEmojiStage(0, false);
 updateDisplay();
-// Ask notification permission on load (browser requires user gesture first,
-// so we defer slightly and let the browser decide)
-setTimeout(requestNotificationPermission, 2000);
 </script>
 </body>
 </html>
