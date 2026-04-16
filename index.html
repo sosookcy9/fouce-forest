@@ -394,7 +394,6 @@ nav{
     <button class="mode-btn" onclick="setMode(30)">30'</button>
     <button class="mode-btn" onclick="setMode(35)">35'</button>
     <button class="mode-btn" onclick="setMode(40)">40'</button>
-    <button class="mode-btn" onclick="setMode(-10)" style="font-size:.72rem;color:var(--red);border-color:rgba(193,68,14,.4);">🧪 10"</button>
   </div>
 
   <!-- Ring -->
@@ -682,14 +681,14 @@ function setMode(m) {
   if(isRunning) return;
   curMode = m;
   document.querySelectorAll('.mode-btn').forEach(b=>{
-    const val = b.textContent.includes('10"') ? -10 : parseInt(b.textContent);
+    const val = parseInt(b.textContent);
     b.classList.toggle('active', val===m);
   });
   updateDisplay();
 }
 
 function updateDisplay() {
-  showTime(curMode === -10 ? 10 : curMode * 60);
+  showTime(curMode * 60);
 }
 
 function showTime(s) {
@@ -703,7 +702,7 @@ function showTime(s) {
 // ─────────────────────────────────────────
 function startFocus() {
   const mins = curMode;
-  totalTime = curMode === -10 ? 10 : mins * 60;
+  totalTime = mins * 60;
   timeLeft  = totalTime;
   startTimestamp = Date.now();
   isRunning = true;
@@ -1104,34 +1103,50 @@ document.addEventListener('visibilitychange', () => {
 // ─────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────
-sb.auth.onAuthStateChange(async (event, session) => {
-  if (session) {
-    currentUser = session.user;
-    document.getElementById('authScreen').style.display = 'none';
-    await loadFromSupabase();
-    // migrate local data if any
-    const local = JSON.parse(localStorage.getItem('fg_garden2') || '[]');
-    if (local.length > 0 && garden.length === 0) {
-      for (const entry of local) { await saveToSupabase(entry); }
-      await loadFromSupabase();
-      localStorage.removeItem('fg_garden2');
-    }
-    garden = garden.map(e => {
-      if (!e.name || !e.emoji) {
-        const tDef = TREES.find(x => x.id === e.tree);
-        if (tDef) { e.name = e.name || tDef.name; e.emoji = e.emoji || tDef.emoji; }
-      }
-      return e;
-    });
-    buildPicker();
-    setEmojiStage(0, false);
-    updateDisplay();
-    renderGarden();
-    renderStats();
-  } else {
-    currentUser = null;
+async function initApp(session) {
+  if (!session) {
     document.getElementById('authScreen').style.display = 'flex';
+    return;
   }
+  currentUser = session.user;
+  document.getElementById('authScreen').style.display = 'none';
+  await loadFromSupabase();
+  // migrate local data if any
+  const local = JSON.parse(localStorage.getItem('fg_garden2') || '[]');
+  if (local.length > 0 && garden.length === 0) {
+    for (const entry of local) { await saveToSupabase(entry); }
+    await loadFromSupabase();
+    localStorage.removeItem('fg_garden2');
+  }
+  garden = garden.map(e => {
+    if (!e.name || !e.emoji) {
+      const tDef = TREES.find(x => x.id === e.tree);
+      if (tDef) { e.name = e.name || tDef.name; e.emoji = e.emoji || tDef.emoji; }
+    }
+    return e;
+  });
+  buildPicker();
+  setEmojiStage(0, false);
+  updateDisplay();
+  renderGarden();
+  renderStats();
+}
+
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN') initApp(session);
+  if (event === 'SIGNED_OUT') {
+    currentUser = null;
+    garden = [];
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('authEmail').value = '';
+    document.getElementById('authPassword').value = '';
+    document.getElementById('authMsg').textContent = '';
+  }
+});
+
+// 頁面載入時檢查是否已登入
+sb.auth.getSession().then(({ data: { session } }) => {
+  initApp(session);
 });
 
 buildPicker();
