@@ -63,7 +63,7 @@ nav{
 .mode-btn{
   padding:5px 14px;border-radius:var(--radius-pill);
   border:1.5px solid var(--green-pale);background:var(--surface2);
-  font-family:'Noto Serif TC',serif;font-size:.74rem;color:var(--green-mid);
+  font-family:'Noto Serif TC',serif;font-size:1rem;color:var(--green-mid);
   cursor:pointer;transition:all .2s;
 }
 .mode-btn.active{background:var(--green-mid);color:#fff;border-color:var(--green-mid);}
@@ -351,10 +351,10 @@ nav{
 <div class="screen active" id="timerScreen">
 
   <div class="mode-row" id="modeRow">
-    <button class="mode-btn active" onclick="setMode('custom')">自訂</button>
-    <button class="mode-btn" onclick="setMode(25)">番茄 25'</button>
-    <button class="mode-btn" onclick="setMode(50)">深度 50'</button>
-    <button class="mode-btn" onclick="setMode(90)">超長 90'</button>
+    <button class="mode-btn active" onclick="setMode(25)">25'</button>
+    <button class="mode-btn" onclick="setMode(30)">30'</button>
+    <button class="mode-btn" onclick="setMode(35)">35'</button>
+    <button class="mode-btn" onclick="setMode(40)">40'</button>
   </div>
 
   <!-- Ring -->
@@ -376,13 +376,6 @@ nav{
   <div class="picker-label">選擇樹種 ›</div>
   <div class="picker-scroll-wrap" id="pickerScrollWrap">
     <div class="tree-picker" id="treePicker"></div>
-  </div>
-
-  <!-- Custom time -->
-  <div class="time-row" id="timeRow">
-    <span>專注</span>
-    <input type="number" id="minInput" value="25" min="1" max="180">
-    <span>分鐘</span>
   </div>
 
   <div class="btn-row" id="btnRow">
@@ -490,9 +483,10 @@ let selTree   = TREES[0];
 let isRunning = false;
 let timeLeft  = 0, totalTime = 0;
 let timerId   = null;
-let curMode   = 'custom';
+let curMode   = 25;
 const CIRC    = 2 * Math.PI * 115; // ~722.6
 let wakeLock  = null;
+let startTimestamp = null;
 
 // ─────────────────────────────────────────
 // NAV
@@ -602,24 +596,15 @@ function applyTreeClass() {} // no-op kept for compat
 function setMode(m) {
   if(isRunning) return;
   curMode = m;
-  document.querySelectorAll('.mode-btn').forEach((b,i)=>{
-    const labels = ['自訂','番茄','深度','超長'];
-    const modeVals = ['custom',25,50,90];
-    b.classList.toggle('active', modeVals[i]===m);
+  document.querySelectorAll('.mode-btn').forEach(b=>{
+    const val = parseInt(b.textContent);
+    b.classList.toggle('active', val===m);
   });
-  if(m !== 'custom') {
-    document.getElementById('minInput').value = m;
-    document.getElementById('timeRow').style.display = 'none';
-  } else {
-    document.getElementById('timeRow').style.display = 'flex';
-  }
   updateDisplay();
 }
 
 function updateDisplay() {
-  const m = parseInt(document.getElementById('minInput').value)||25;
-  const secs = (curMode==='custom'?m:curMode)*60;
-  showTime(secs);
+  showTime(curMode * 60);
 }
 
 function showTime(s) {
@@ -632,11 +617,10 @@ function showTime(s) {
 // FOCUS
 // ─────────────────────────────────────────
 function startFocus() {
-  const mins = curMode==='custom'
-    ? parseInt(document.getElementById('minInput').value)||25
-    : curMode;
+  const mins = curMode;
   totalTime = mins * 60;
   timeLeft  = totalTime;
+  startTimestamp = Date.now();
   isRunning = true;
 
   setEmojiStage(0, false);
@@ -650,9 +634,8 @@ function startFocus() {
 
   document.getElementById('modeRow').style.display = 'none';
   document.getElementById('pickerScrollWrap').style.display = 'none';
-  document.getElementById('timeRow').style.display = 'none';
   document.getElementById('btnRow').innerHTML =
-    `<button class="btn btn-danger" onclick="giveUp()">😔 放棄（樹枯死）</button>`;
+    `<button class="btn btn-danger" onclick="giveUp()">放棄（樹枯死）</button>`;
 
   void el.offsetWidth;
   el.classList.add('tree-breathing');
@@ -661,21 +644,18 @@ function startFocus() {
 }
 
 function tick() {
-  timeLeft--;
+  const elapsed = Math.floor((Date.now() - startTimestamp) / 1000);
+  timeLeft = Math.max(totalTime - elapsed, 0);
   showTime(timeLeft);
-  const prog = (totalTime-timeLeft)/totalTime;
-  setRing(prog);
-  // 5 growth stages across the session
+  const prog = elapsed / totalTime;
+  setRing(Math.min(prog, 1));
   const stageIdx = prog < .15 ? 0
     : prog < .35 ? 1
     : prog < .60 ? 2
     : prog < .85 ? 3
     : 3;
   if (stageIdx !== currentStageIdx) setEmojiStage(stageIdx);
-  // Ambient particles
-  const particles = TREE_STAGES[selTree.id]
-    ? ['🍃','🌿','✨','💨']
-    : ['🍃','🌿','✨'];
+  const particles = ['🍃','🌿','✨','💨'];
   if(Math.random()<.06) spawnParticle(particles[Math.floor(Math.random()*particles.length)]);
   if(timeLeft<=0) finishFocus();
 }
@@ -721,37 +701,52 @@ function dismissOverlay() {
 }
 
 function giveUp() {
-  if(!confirm('確定放棄？樹會枯死喔 🥀')) return;
-  clearInterval(timerId); isRunning=false;
-  releaseWakeLock();
-  const gEl = document.getElementById('treeEmojiDisplay');
-  if(gEl) gEl.classList.remove('tree-breathing');
-  setDeadStage();
-  document.getElementById('ringFill').classList.add('dying');
-  document.getElementById('timerLbl').textContent='已放棄';
-  document.getElementById('statusMsg').className='status-msg fail';
-  document.getElementById('statusMsg').textContent='哎呀…樹枯死了 🥀';
-
-  // fall leaves around the emoji
-  const c = document.getElementById('treeEmojiDisplay');
-  if(c){['🍂','🍁','🍂'].forEach((l,i)=>{
-    const el=document.createElement('span');
-    el.className='fall-leaf';
-    el.textContent=l;
-    el.style.cssText=`--dx:${(Math.random()-.5)*50}px;--dr:${(Math.random()-.5)*80}deg;top:10%;left:${20+i*25}%;font-size:14px;position:absolute;`;
-    c.style.position='relative';
-    c.appendChild(el);
-    setTimeout(()=>el.remove(),1600);
-  });}
-
-  const entry={tree:selTree.id,emoji:selTree.emoji,name:selTree.name,
-    mins:Math.round((totalTime-timeLeft)/60)||0,date:todayStr(),dead:true};
-  garden.push(entry); save();
-  setTimeout(resetUI,1900);
+  // Custom confirm dialog (iOS Safari confirm() can be unreliable in some contexts)
+  const dialog = document.createElement('div');
+  dialog.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:center;justify-content:center;';
+  dialog.innerHTML = `
+    <div style="background:#fff;border-radius:20px;padding:28px 24px;max-width:300px;width:88%;text-align:center;font-family:'Noto Serif TC',serif;">
+      <div style="font-size:2.2rem;margin-bottom:10px;">🥀</div>
+      <div style="font-size:1rem;color:#1b4332;font-weight:600;margin-bottom:6px;">確定放棄？</div>
+      <div style="font-size:.82rem;color:#2d6a4f;margin-bottom:20px;">樹會枯死喔</div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button id="giveUpCancel" style="flex:1;padding:10px;border-radius:40px;border:1.5px solid #b7e4c7;background:#fff;font-family:'Noto Serif TC',serif;font-size:.88rem;color:#2d6a4f;cursor:pointer;">繼續專注</button>
+        <button id="giveUpConfirm" style="flex:1;padding:10px;border-radius:40px;border:none;background:#c1440e;color:#fff;font-family:'Noto Serif TC',serif;font-size:.88rem;cursor:pointer;">放棄</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+  document.getElementById('giveUpCancel').onclick = () => dialog.remove();
+  document.getElementById('giveUpConfirm').onclick = () => {
+    dialog.remove();
+    clearInterval(timerId); isRunning=false;
+    releaseWakeLock();
+    const gEl = document.getElementById('treeEmojiDisplay');
+    if(gEl) gEl.classList.remove('tree-breathing');
+    setDeadStage();
+    document.getElementById('ringFill').classList.add('dying');
+    document.getElementById('timerLbl').textContent='已放棄';
+    document.getElementById('statusMsg').className='status-msg fail';
+    document.getElementById('statusMsg').textContent='哎呀…樹枯死了 🥀';
+    const c = document.getElementById('treeEmojiDisplay');
+    if(c){['🍂','🍁','🍂'].forEach((l,i)=>{
+      const el=document.createElement('span');
+      el.className='fall-leaf';
+      el.textContent=l;
+      el.style.cssText=`--dx:${(Math.random()-.5)*50}px;--dr:${(Math.random()-.5)*80}deg;top:10%;left:${20+i*25}%;font-size:14px;position:absolute;`;
+      c.style.position='relative';
+      c.appendChild(el);
+      setTimeout(()=>el.remove(),1600);
+    });}
+    const entry={tree:selTree.id,emoji:selTree.emoji,name:selTree.name,
+      mins:Math.round((totalTime-timeLeft)/60)||0,date:todayStr(),dead:true};
+    garden.push(entry); save();
+    setTimeout(resetUI,1900);
+  };
 }
 
 function resetUI() {
   isRunning=false;
+  startTimestamp=null;
   setStage(0);
   setRing(0);
   document.getElementById('ringFill').classList.remove('dying');
@@ -762,10 +757,10 @@ function resetUI() {
   document.getElementById('pickerScrollWrap').style.display='block';
   const rEl = document.getElementById('treeEmojiDisplay');
   if(rEl){ rEl.classList.remove('tree-breathing','tree-boom','tree-grow-anim'); rEl.style.filter=''; }
-  document.getElementById('timeRow').style.display = curMode==='custom'?'flex':'none';
   document.getElementById('btnRow').innerHTML=
     `<button class="btn btn-primary" onclick="startFocus()">🌱 開始種植</button>`;
   updateDisplay();
+  go('timer');
 }
 
 // ─────────────────────────────────────────
@@ -1038,7 +1033,16 @@ function releaseWakeLock() {
 
 // Re-acquire wake lock if page becomes visible again (iOS releases it on hide)
 document.addEventListener('visibilitychange', () => {
-  if (isRunning && document.visibilityState === 'visible') requestWakeLock();
+  if (!isRunning) return;
+  if (document.visibilityState === 'visible') {
+    requestWakeLock();
+    // Check if timer already expired while hidden
+    const elapsed = Math.floor((Date.now() - startTimestamp) / 1000);
+    if (elapsed >= totalTime) {
+      clearInterval(timerId);
+      finishFocus();
+    }
+  }
 });
 
 async function requestNotificationPermission() {
@@ -1071,7 +1075,7 @@ garden = garden.map(e => {
 });
 save(); // write back migrated data
 
-document.getElementById('minInput').addEventListener('input', updateDisplay);
+document.getElementById('minInput') && document.getElementById('minInput').addEventListener('input', updateDisplay);
 buildPicker();
 
 // Drag-to-scroll picker
