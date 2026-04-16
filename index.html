@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>專注森林</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -391,6 +391,7 @@ nav{
 <div class="screen active" id="timerScreen">
 
   <div class="mode-row" id="modeRow">
+    <button class="mode-btn" onclick="setMode(0.17)">10″</button>
     <button class="mode-btn active" onclick="setMode(25)">25'</button>
     <button class="mode-btn" onclick="setMode(30)">30'</button>
     <button class="mode-btn" onclick="setMode(35)">35'</button>
@@ -404,6 +405,7 @@ nav{
       <circle class="ring-fill" id="ringFill" cx="135" cy="135" r="115"/>
     </svg>
     <div class="ring-inner">
+      <canvas id="treeCanvas" width="200" height="200" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;"></canvas>
       <div class="tree-emoji-display" id="treeEmojiDisplay">🌱</div>
       <div class="timer-num" id="timerNum">25:00</div>
       <div class="timer-lbl" id="timerLbl">準備開始</div>
@@ -473,37 +475,396 @@ nav{
 </div>
 
 <script>
+// ═══════════════════════════════════════════
+// L-SYSTEM ENGINE
+// ═══════════════════════════════════════════
+const lsCanvas = document.getElementById('treeCanvas');
+const lsCtx    = lsCanvas.getContext('2d');
+const LSW = 200, LSH = 200;
+let lsAnimId = null;
+
+const LS_C = {
+  soil:'#a0785a', soilDark:'#7a5c40', soilLight:'#b89070',
+  trunk:'#3a2010', trunkMid:'#5c3418', trunkLight:'#7a4e28',
+  oakLeafDark:'#1b4332', oakLeaf:'#2d6a4f', oakLeafMid:'#52b788', oakLeafLight:'#74c69d', oakLeafPale:'#95d5b2',
+  oakAcornBody:'#8B5E3C', oakAcornCap:'#5C3D1E', oakAcornStem:'#4a2e1a',
+  sakuraPetal:'#ffb7c5', sakuraPetal2:'#ff8fab', sakuraCenter:'#fff0f3', sakuraTwig:'#6b3a2a',
+  pineDark:'#1a3320', pineMid:'#2d5a1b', pineLight:'#4a7c3f', pinePale:'#6aab5e', pineTrunk:'#5c3418',
+  mapleRed:'#c1440e', mapleOrange:'#e05c00', mapleYellow:'#f0a500', mapleTrunk:'#4a2e1a',
+  plumPetal:'#f4a7b9', plumPetal2:'#e8799a', plumCenter:'#fff', plumTwig:'#5c3418',
+  rosePetal:'#c0392b', rosePetal2:'#e74c3c', rosePetal3:'#f1948a', roseStem:'#1a5c2a', roseLeaf:'#2d6a4f',
+  vineGreen:'#2d6a4f', vineLeaf:'#52b788', vineLeafDark:'#1b4332', vineGrape:'#6b2fa0', vineGrape2:'#8b44c0',
+  seed:'#3d2010',
+};
+
+function lsClear(){ lsCtx.clearRect(0,0,LSW,LSH); }
+
+function lsDrawSoil(){
+  lsCtx.save();
+  lsCtx.beginPath(); lsCtx.ellipse(LSW/2,LSH-10,72,15,0,0,Math.PI*2);
+  lsCtx.fillStyle=LS_C.soilDark; lsCtx.globalAlpha=0.92; lsCtx.fill();
+  lsCtx.beginPath(); lsCtx.ellipse(LSW/2,LSH-15,60,11,0,0,Math.PI*2);
+  lsCtx.fillStyle=LS_C.soil; lsCtx.globalAlpha=0.88; lsCtx.fill();
+  lsCtx.restore();
+}
+
+function lsExpand(axiom, rules, iters){
+  let s=axiom;
+  for(let i=0;i<iters;i++) s=s.split('').map(c=>rules[c]||c).join('');
+  return s;
+}
+
+function lsParse(str, x0, y0, len, angle, jitter){
+  const stack=[], segs=[];
+  let x=x0, y=y0, dir=-Math.PI/2, depth=0;
+  for(const c of str){
+    if(c==='F'||c==='G'){
+      const j=(Math.random()-.5)*jitter;
+      const nx=x+Math.cos(dir+j)*len, ny=y+Math.sin(dir+j)*len;
+      segs.push({x1:x,y1:y,x2:nx,y2:ny,len,depth,type:c});
+      x=nx; y=ny;
+    } else if(c==='+') dir+=angle*(0.85+Math.random()*0.3);
+    else if(c==='-') dir-=angle*(0.85+Math.random()*0.3);
+    else if(c==='['){stack.push({x,y,dir,len,depth});len*=0.64;depth++;}
+    else if(c===']'){const sv=stack.pop();x=sv.x;y=sv.y;dir=sv.dir;len=sv.len;depth=sv.depth;}
+  }
+  return segs;
+}
+
+function lsGetTips(segs, yThresh){
+  const starts=new Set(segs.map(s=>`${s.x1.toFixed(1)},${s.y1.toFixed(1)}`));
+  return segs
+    .filter(s=>!starts.has(`${s.x2.toFixed(1)},${s.y2.toFixed(1)}`))
+    .filter(s=>s.y2<yThresh)
+    .map(s=>({x:s.x2,y:s.y2,depth:s.depth}));
+}
+
+function _lsDrawSeed(){
+  lsCtx.save(); lsCtx.globalAlpha=.92;
+  lsCtx.beginPath(); lsCtx.ellipse(LSW/2,LSH-30,5,8,.15,0,Math.PI*2);
+  lsCtx.fillStyle=LS_C.seed; lsCtx.fill();
+  lsCtx.beginPath(); lsCtx.moveTo(LSW/2,LSH-37);
+  lsCtx.bezierCurveTo(LSW/2+6,LSH-45,LSW/2-4,LSH-50,LSW/2+2,LSH-55);
+  lsCtx.strokeStyle=LS_C.oakLeafMid; lsCtx.lineWidth=1.8; lsCtx.lineCap='round'; lsCtx.globalAlpha=.75; lsCtx.stroke();
+  lsCtx.beginPath(); lsCtx.ellipse(LSW/2+4,LSH-55,5,4,.5,0,Math.PI*2);
+  lsCtx.fillStyle=LS_C.oakLeafLight; lsCtx.globalAlpha=.7; lsCtx.fill();
+  lsCtx.restore();
+}
+
+function _lsAnimate(segs, maxD, drawSegFn, drawLeavesFn, animate, stage){
+  if(lsAnimId) cancelAnimationFrame(lsAnimId);
+  const ordered=[...segs].sort((a,b)=>a.depth-b.depth);
+  if(!animate){ ordered.forEach(s=>drawSegFn(s)); drawLeavesFn(); return; }
+  let i=0, lastTs=null;
+  const dur=[0,700,1000,1200][stage];
+  const msPerSeg=dur/ordered.length;
+  function frame(ts){
+    if(!lastTs) lastTs=ts;
+    const steps=Math.max(1,Math.floor((ts-lastTs)/msPerSeg));
+    for(let b=0;b<steps&&i<ordered.length;b++,i++) drawSegFn(ordered[i]);
+    lastTs=ts;
+    if(i<ordered.length) lsAnimId=requestAnimationFrame(frame);
+    else drawLeavesFn();
+  }
+  lsAnimId=requestAnimationFrame(frame);
+}
+
+function drawLS_oak(stage, animate){
+  const RULES={F:'FF',X:'F+[[X]-X]-F[-FX]+X'};
+  const CFGS=[null,{iters:2,len:13,angle:.50,jitter:.08},{iters:3,len:9,angle:.48,jitter:.14},{iters:3,len:9,angle:.48,jitter:.14}];
+  const YTHR={1:LSH,2:LSH*.72,3:LSH*.62};
+  if(stage===0){lsClear();lsDrawSoil();_lsDrawSeed();return;}
+  const cfg=CFGS[stage];
+  const segs=lsParse(lsExpand('X',RULES,cfg.iters),LSW/2,LSH-26,cfg.len,cfg.angle,cfg.jitter);
+  const tips=lsGetTips(segs,YTHR[stage]);
+  const maxD=Math.max(...segs.map(s=>s.depth));
+  function drawSeg(s){
+    const dr=1-(s.depth/(maxD+1));
+    lsCtx.save();lsCtx.beginPath();lsCtx.moveTo(s.x1,s.y1);lsCtx.lineTo(s.x2,s.y2);
+    lsCtx.strokeStyle=dr>.7?LS_C.trunk:dr>.4?LS_C.trunkMid:LS_C.trunkLight;
+    lsCtx.lineWidth=0.8+dr*(stage===3?11:7.5);lsCtx.lineCap='round';lsCtx.globalAlpha=.94;lsCtx.stroke();lsCtx.restore();
+  }
+  function drawLeaves(){
+    const sh=[...tips].sort(()=>Math.random()-.5);
+    sh.forEach(t=>{
+      const bc=stage===3?6:2, sp=stage===3?16:7, rb=stage===3?14:7, rr=stage===3?8:4;
+      for(let b=0;b<bc;b++){
+        const ox=(Math.random()-.5)*sp,oy=(Math.random()-.5)*sp,r=rb+Math.random()*rr;
+        const cols=[LS_C.oakLeafDark,LS_C.oakLeaf,LS_C.oakLeafMid,LS_C.oakLeafLight];
+        lsCtx.save();lsCtx.globalAlpha=.72+Math.random()*.2;lsCtx.beginPath();
+        lsCtx.arc(t.x+ox,t.y+oy,r,0,Math.PI*2);lsCtx.fillStyle=cols[Math.floor(Math.random()*3)];lsCtx.fill();lsCtx.restore();
+      }
+    });
+    if(stage===3){
+      sh.slice(0,Math.ceil(sh.length*.4)).forEach(t=>{
+        lsCtx.save();lsCtx.globalAlpha=.25;lsCtx.beginPath();
+        lsCtx.arc(t.x+(Math.random()-.5)*5,t.y+(Math.random()-.5)*5,7+Math.random()*6,0,Math.PI*2);
+        lsCtx.fillStyle=LS_C.oakLeafPale;lsCtx.fill();lsCtx.restore();
+      });
+      [...tips].sort(()=>Math.random()-.5).slice(0,5).forEach(t=>{
+        const ax=t.x+(Math.random()-.5)*10,ay=t.y+4+Math.random()*6;
+        lsCtx.save();lsCtx.globalAlpha=.88;
+        lsCtx.beginPath();lsCtx.moveTo(ax,ay-8);lsCtx.lineTo(ax,ay-3);
+        lsCtx.strokeStyle=LS_C.oakAcornStem;lsCtx.lineWidth=1.3;lsCtx.lineCap='round';lsCtx.stroke();
+        lsCtx.beginPath();lsCtx.ellipse(ax,ay-3,5.5,3.2,0,0,Math.PI*2);lsCtx.fillStyle=LS_C.oakAcornCap;lsCtx.fill();
+        lsCtx.beginPath();lsCtx.ellipse(ax,ay+2,4.5,6,0,0,Math.PI*2);lsCtx.fillStyle=LS_C.oakAcornBody;lsCtx.fill();
+        lsCtx.restore();
+      });
+    }
+  }
+  lsClear();lsDrawSoil();
+  _lsAnimate(segs,maxD,drawSeg,drawLeaves,animate,stage);
+}
+
+function drawLS_sakura(stage, animate){
+  const RULES={F:'FF',X:'F+[[X]-X]-F[-FX]+X'};
+  const CFGS=[null,{iters:2,len:11,angle:.52,jitter:.10},{iters:3,len:8,angle:.50,jitter:.16},{iters:3,len:8,angle:.50,jitter:.16}];
+  const YTHR={1:LSH,2:LSH*.70,3:LSH*.58};
+  if(stage===0){lsClear();lsDrawSoil();_lsDrawSeed();return;}
+  const cfg=CFGS[stage];
+  const segs=lsParse(lsExpand('X',RULES,cfg.iters),LSW/2,LSH-26,cfg.len,cfg.angle,cfg.jitter);
+  const tips=lsGetTips(segs,YTHR[stage]);
+  const maxD=Math.max(...segs.map(s=>s.depth));
+  function drawSeg(s){
+    const dr=1-(s.depth/(maxD+1));
+    lsCtx.save();lsCtx.beginPath();lsCtx.moveTo(s.x1,s.y1);lsCtx.lineTo(s.x2,s.y2);
+    lsCtx.strokeStyle=dr>.5?LS_C.sakuraTwig:LS_C.trunkMid;
+    lsCtx.lineWidth=0.6+dr*(stage===3?7:5);lsCtx.lineCap='round';lsCtx.globalAlpha=.92;lsCtx.stroke();lsCtx.restore();
+  }
+  function drawLeaves(){
+    [...tips].sort(()=>Math.random()-.5).forEach(t=>{
+      const cnt=stage===3?8:3;
+      for(let i=0;i<cnt;i++){
+        const angle=Math.random()*Math.PI*2, r=4+Math.random()*5;
+        const px=t.x+Math.cos(angle)*r*(stage===3?3:1.5);
+        const py=t.y+Math.sin(angle)*r*(stage===3?3:1.5);
+        for(let p=0;p<5;p++){
+          const pa=p*Math.PI*2/5+Math.random()*.3;
+          lsCtx.save();lsCtx.globalAlpha=.7+Math.random()*.25;
+          lsCtx.beginPath();lsCtx.ellipse(px+Math.cos(pa)*4,py+Math.sin(pa)*4,3.5,2.5,pa,0,Math.PI*2);
+          lsCtx.fillStyle=i%2===0?LS_C.sakuraPetal:LS_C.sakuraPetal2;lsCtx.fill();lsCtx.restore();
+        }
+        lsCtx.save();lsCtx.globalAlpha=.9;lsCtx.beginPath();
+        lsCtx.arc(px,py,2,0,Math.PI*2);lsCtx.fillStyle=LS_C.sakuraCenter;lsCtx.fill();lsCtx.restore();
+      }
+    });
+  }
+  lsClear();lsDrawSoil();
+  _lsAnimate(segs,maxD,drawSeg,drawLeaves,animate,stage);
+}
+
+function drawLS_pine(stage, animate){
+  const RULES={F:'FF',X:'F-[[X]+X]+F[+FX]-X'};
+  const CFGS=[null,{iters:2,len:12,angle:.42,jitter:.06},{iters:3,len:8,angle:.40,jitter:.10},{iters:3,len:8,angle:.40,jitter:.10}];
+  const YTHR={1:LSH,2:LSH*.75,3:LSH*.60};
+  if(stage===0){lsClear();lsDrawSoil();_lsDrawSeed();return;}
+  const cfg=CFGS[stage];
+  const segs=lsParse(lsExpand('X',RULES,cfg.iters),LSW/2,LSH-26,cfg.len,cfg.angle,cfg.jitter);
+  const tips=lsGetTips(segs,YTHR[stage]);
+  const maxD=Math.max(...segs.map(s=>s.depth));
+  function drawSeg(s){
+    const dr=1-(s.depth/(maxD+1));
+    lsCtx.save();lsCtx.beginPath();lsCtx.moveTo(s.x1,s.y1);lsCtx.lineTo(s.x2,s.y2);
+    lsCtx.strokeStyle=dr>.6?LS_C.pineTrunk:dr>.3?LS_C.trunkMid:LS_C.pineLight;
+    lsCtx.lineWidth=0.7+dr*(stage===3?10:7);lsCtx.lineCap='round';lsCtx.globalAlpha=.93;lsCtx.stroke();lsCtx.restore();
+  }
+  function drawLeaves(){
+    [...tips].sort(()=>Math.random()-.5).forEach(t=>{
+      const len2=stage===3?14:7;
+      for(let i=0;i<(stage===3?5:2);i++){
+        const angle=-Math.PI/2+(Math.random()-.5)*(stage===3?.7:.4);
+        lsCtx.save();lsCtx.globalAlpha=.8+Math.random()*.15;
+        lsCtx.beginPath();lsCtx.moveTo(t.x,t.y);
+        lsCtx.lineTo(t.x+Math.cos(angle+.35)*len2,t.y+Math.sin(angle+.35)*len2);
+        lsCtx.lineTo(t.x+Math.cos(angle-.35)*len2,t.y+Math.sin(angle-.35)*len2);
+        lsCtx.closePath();
+        lsCtx.fillStyle=[LS_C.pineDark,LS_C.pineMid,LS_C.pineLight][Math.floor(Math.random()*3)];lsCtx.fill();lsCtx.restore();
+      }
+    });
+  }
+  lsClear();lsDrawSoil();
+  _lsAnimate(segs,maxD,drawSeg,drawLeaves,animate,stage);
+}
+
+function drawLS_maple(stage, animate){
+  const RULES={F:'FF',X:'F+[[X]-X]-F[-FX]+X'};
+  const CFGS=[null,{iters:2,len:12,angle:.55,jitter:.12},{iters:3,len:8.5,angle:.52,jitter:.18},{iters:3,len:8.5,angle:.52,jitter:.18}];
+  const YTHR={1:LSH,2:LSH*.70,3:LSH*.58};
+  if(stage===0){lsClear();lsDrawSoil();_lsDrawSeed();return;}
+  const cfg=CFGS[stage];
+  const segs=lsParse(lsExpand('X',RULES,cfg.iters),LSW/2,LSH-26,cfg.len,cfg.angle,cfg.jitter);
+  const tips=lsGetTips(segs,YTHR[stage]);
+  const maxD=Math.max(...segs.map(s=>s.depth));
+  function drawSeg(s){
+    const dr=1-(s.depth/(maxD+1));
+    lsCtx.save();lsCtx.beginPath();lsCtx.moveTo(s.x1,s.y1);lsCtx.lineTo(s.x2,s.y2);
+    lsCtx.strokeStyle=dr>.6?LS_C.mapleTrunk:dr>.3?LS_C.trunkMid:LS_C.trunkLight;
+    lsCtx.lineWidth=0.7+dr*(stage===3?10:7);lsCtx.lineCap='round';lsCtx.globalAlpha=.93;lsCtx.stroke();lsCtx.restore();
+  }
+  function drawLeaves(){
+    const cols=[LS_C.mapleRed,LS_C.mapleOrange,LS_C.mapleYellow,LS_C.mapleRed];
+    [...tips].sort(()=>Math.random()-.5).forEach(t=>{
+      for(let i=0;i<(stage===3?5:2);i++){
+        const ox=(Math.random()-.5)*(stage===3?20:10),oy=(Math.random()-.5)*(stage===3?20:10);
+        const r=stage===3?10+Math.random()*6:5+Math.random()*3;
+        lsCtx.save();lsCtx.globalAlpha=.75+Math.random()*.2;
+        lsCtx.translate(t.x+ox,t.y+oy);lsCtx.rotate(Math.random()*Math.PI*2);
+        lsCtx.beginPath();
+        for(let p=0;p<5;p++){
+          const a=p*Math.PI*2/5-Math.PI/2;
+          p===0?lsCtx.moveTo(Math.cos(a)*r,Math.sin(a)*r):lsCtx.lineTo(Math.cos(a)*r,Math.sin(a)*r);
+        }
+        lsCtx.closePath();lsCtx.fillStyle=cols[Math.floor(Math.random()*cols.length)];lsCtx.fill();lsCtx.restore();
+      }
+    });
+  }
+  lsClear();lsDrawSoil();
+  _lsAnimate(segs,maxD,drawSeg,drawLeaves,animate,stage);
+}
+
+function drawLS_plum(stage, animate){
+  const RULES={F:'FF',X:'F+[[X]-X]-F[-FX]+X'};
+  const CFGS=[null,{iters:2,len:11,angle:.54,jitter:.10},{iters:3,len:7.5,angle:.52,jitter:.14},{iters:3,len:7.5,angle:.52,jitter:.14}];
+  const YTHR={1:LSH,2:LSH*.68,3:LSH*.56};
+  if(stage===0){lsClear();lsDrawSoil();_lsDrawSeed();return;}
+  const cfg=CFGS[stage];
+  const segs=lsParse(lsExpand('X',RULES,cfg.iters),LSW/2,LSH-26,cfg.len,cfg.angle,cfg.jitter);
+  const tips=lsGetTips(segs,YTHR[stage]);
+  const maxD=Math.max(...segs.map(s=>s.depth));
+  function drawSeg(s){
+    const dr=1-(s.depth/(maxD+1));
+    lsCtx.save();lsCtx.beginPath();lsCtx.moveTo(s.x1,s.y1);lsCtx.lineTo(s.x2,s.y2);
+    lsCtx.strokeStyle=dr>.5?LS_C.trunk:LS_C.trunkMid;
+    lsCtx.lineWidth=0.6+dr*(stage===3?8:5.5);lsCtx.lineCap='round';lsCtx.globalAlpha=.92;lsCtx.stroke();lsCtx.restore();
+  }
+  function drawLeaves(){
+    [...tips].sort(()=>Math.random()-.5).forEach(t=>{
+      for(let i=0;i<(stage===3?7:3);i++){
+        const angle=Math.random()*Math.PI*2, dist=stage===3?10+Math.random()*8:4+Math.random()*4;
+        const px=t.x+Math.cos(angle)*dist, py=t.y+Math.sin(angle)*dist;
+        for(let p=0;p<5;p++){
+          const pa=p*Math.PI*2/5;
+          lsCtx.save();lsCtx.globalAlpha=.72+Math.random()*.22;
+          lsCtx.beginPath();lsCtx.ellipse(px+Math.cos(pa)*3.5,py+Math.sin(pa)*3.5,3,2,pa,0,Math.PI*2);
+          lsCtx.fillStyle=i%2===0?LS_C.plumPetal:LS_C.plumPetal2;lsCtx.fill();lsCtx.restore();
+        }
+        lsCtx.save();lsCtx.globalAlpha=.9;lsCtx.beginPath();
+        lsCtx.arc(px,py,1.8,0,Math.PI*2);lsCtx.fillStyle=LS_C.plumCenter;lsCtx.fill();lsCtx.restore();
+      }
+    });
+  }
+  lsClear();lsDrawSoil();
+  _lsAnimate(segs,maxD,drawSeg,drawLeaves,animate,stage);
+}
+
+function drawLS_rose(stage, animate){
+  const RULES={F:'FF',X:'F+[X+F]-[X-F]+[FX]'};
+  const CFGS=[null,{iters:2,len:14,angle:.38,jitter:.08},{iters:3,len:9,angle:.36,jitter:.12},{iters:3,len:9,angle:.36,jitter:.12}];
+  const YTHR={1:LSH,2:LSH*.65,3:LSH*.50};
+  if(stage===0){lsClear();lsDrawSoil();_lsDrawSeed();return;}
+  const cfg=CFGS[stage];
+  const segs=lsParse(lsExpand('X',RULES,cfg.iters),LSW/2,LSH-26,cfg.len,cfg.angle,cfg.jitter);
+  const tips=lsGetTips(segs,YTHR[stage]);
+  const maxD=Math.max(...segs.map(s=>s.depth));
+  function drawSeg(s){
+    const dr=1-(s.depth/(maxD+1));
+    lsCtx.save();lsCtx.beginPath();lsCtx.moveTo(s.x1,s.y1);lsCtx.lineTo(s.x2,s.y2);
+    lsCtx.strokeStyle=dr>.5?LS_C.roseStem:LS_C.roseLeaf;
+    lsCtx.lineWidth=0.6+dr*(stage===3?6:4);lsCtx.lineCap='round';lsCtx.globalAlpha=.92;lsCtx.stroke();lsCtx.restore();
+  }
+  function drawLeaves(){
+    segs.filter(s=>s.depth>0&&s.depth<maxD-1&&Math.random()<.3).forEach(s=>{
+      lsCtx.save();lsCtx.globalAlpha=.7;lsCtx.beginPath();
+      lsCtx.ellipse((s.x1+s.x2)/2,(s.y1+s.y2)/2,5,3,Math.atan2(s.y2-s.y1,s.x2-s.x1)+Math.PI/4,0,Math.PI*2);
+      lsCtx.fillStyle=LS_C.roseLeaf;lsCtx.fill();lsCtx.restore();
+    });
+    [...tips].sort(()=>Math.random()-.5).slice(0,stage===3?tips.length:Math.ceil(tips.length*.5)).forEach(t=>{
+      const r=stage===3?12:7;
+      for(let layer=stage===3?3:1;layer>=0;layer--){
+        const lr=r*(1-layer*.25), cnt=stage===3?7:4;
+        for(let p=0;p<cnt;p++){
+          const a=p*Math.PI*2/cnt+(layer*.3);
+          lsCtx.save();lsCtx.globalAlpha=.75+Math.random()*.2;
+          lsCtx.beginPath();lsCtx.ellipse(t.x+Math.cos(a)*lr*.6,t.y+Math.sin(a)*lr*.6,lr*.55,lr*.4,a,0,Math.PI*2);
+          lsCtx.fillStyle=[LS_C.rosePetal,LS_C.rosePetal2,LS_C.rosePetal3][Math.min(layer,2)];lsCtx.fill();lsCtx.restore();
+        }
+      }
+    });
+  }
+  lsClear();lsDrawSoil();
+  _lsAnimate(segs,maxD,drawSeg,drawLeaves,animate,stage);
+}
+
+function drawLS_vine(stage, animate){
+  const RULES={F:'FF',X:'F+[[X]-X+F]-F[-X+FX]+X'};
+  const CFGS=[null,{iters:2,len:12,angle:.50,jitter:.14},{iters:3,len:8,angle:.48,jitter:.18},{iters:3,len:8,angle:.48,jitter:.18}];
+  const YTHR={1:LSH,2:LSH*.72,3:LSH*.55};
+  if(stage===0){lsClear();lsDrawSoil();_lsDrawSeed();return;}
+  const cfg=CFGS[stage];
+  const segs=lsParse(lsExpand('X',RULES,cfg.iters),LSW/2,LSH-26,cfg.len,cfg.angle,cfg.jitter);
+  const tips=lsGetTips(segs,YTHR[stage]);
+  const maxD=Math.max(...segs.map(s=>s.depth));
+  function drawSeg(s){
+    const dr=1-(s.depth/(maxD+1));
+    lsCtx.save();lsCtx.beginPath();lsCtx.moveTo(s.x1,s.y1);lsCtx.lineTo(s.x2,s.y2);
+    lsCtx.strokeStyle=dr>.6?LS_C.trunk:LS_C.vineGreen;
+    lsCtx.lineWidth=0.5+dr*(stage===3?7:5);lsCtx.lineCap='round';lsCtx.globalAlpha=.90;lsCtx.stroke();lsCtx.restore();
+  }
+  function drawLeaves(){
+    segs.filter(s=>s.depth>1&&Math.random()<.4).forEach(s=>{
+      lsCtx.save();lsCtx.globalAlpha=.72+Math.random()*.2;
+      lsCtx.translate((s.x1+s.x2)/2,(s.y1+s.y2)/2);lsCtx.rotate(Math.random()*Math.PI*2);
+      const r=stage===3?8:5;
+      lsCtx.beginPath();lsCtx.arc(-r/2,0,r/2,0,Math.PI*2);lsCtx.fillStyle=LS_C.vineLeaf;lsCtx.fill();
+      lsCtx.beginPath();lsCtx.arc(r/2,0,r/2,0,Math.PI*2);lsCtx.fill();
+      lsCtx.restore();
+    });
+    if(stage===3){
+      [...tips].sort(()=>Math.random()-.5).slice(0,Math.ceil(tips.length*.6)).forEach(t=>{
+        for(let i=0;i<(8+Math.floor(Math.random()*6));i++){
+          const col=Math.floor(i/3), row2=i%3;
+          const gx=t.x+(row2-1)*8+(Math.random()-.5)*3, gy=t.y+col*7+4+(Math.random()-.5)*3;
+          lsCtx.save();lsCtx.globalAlpha=.85+Math.random()*.1;lsCtx.beginPath();
+          lsCtx.arc(gx,gy,4.5,0,Math.PI*2);lsCtx.fillStyle=i%2===0?LS_C.vineGrape:LS_C.vineGrape2;lsCtx.fill();
+          lsCtx.globalAlpha=.2;lsCtx.beginPath();lsCtx.arc(gx-1,gy-1,2,0,Math.PI*2);
+          lsCtx.fillStyle='#fff';lsCtx.fill();lsCtx.restore();
+        }
+      });
+    }
+  }
+  lsClear();lsDrawSoil();
+  _lsAnimate(segs,maxD,drawSeg,drawLeaves,animate,stage);
+}
+
+const LS_DRAW_FN = {
+  oak:drawLS_oak, sakura:drawLS_sakura, pine:drawLS_pine,
+  maple:drawLS_maple, plum:drawLS_plum, rose:drawLS_rose, vine:drawLS_vine,
+};
+
+function lsSetStage(treeId, stage, animate=true){
+  const fn=LS_DRAW_FN[treeId];
+  if(fn) fn(stage, animate);
+}
+
+
 // ─────────────────────────────────────────
 // TREE DEFINITIONS
 // ─────────────────────────────────────────
 const TREES = [
-  // ── 原有樹種 ──
-  { id:'oak',       emoji:'🌳', name:'橡樹',   cls:'oak',      bloomEmoji:'🌳' },
-  { id:'sakura',    emoji:'🌸', name:'櫻花',   cls:'sakura',   bloomEmoji:'🌸' },
-  { id:'pine',      emoji:'🌲', name:'松樹',   cls:'pine',     bloomEmoji:'🌲' },
-  { id:'maple',     emoji:'🍁', name:'楓樹',   cls:'maple',    bloomEmoji:'🍂' },
-  { id:'bamboo',    emoji:'🎋', name:'竹子',   cls:'bamboo',   bloomEmoji:'🎋' },
-  { id:'palm',      emoji:'🌴', name:'椰子樹', cls:'palm',     bloomEmoji:'🌴' },
-  { id:'hibiscus',  emoji:'🌺', name:'木槿',   cls:'hibiscus', bloomEmoji:'🌺' },
-  { id:'moss',      emoji:'🍀', name:'苔球',   cls:'moss',     bloomEmoji:'🌿' },
-  // ── 花卉類 ──
-  { id:'sunflower', emoji:'🌻', name:'向日葵', cls:'sunflower',bloomEmoji:'🌻' },
-  { id:'rose',      emoji:'🌹', name:'玫瑰',   cls:'rose',     bloomEmoji:'🌹' },
-  { id:'tulip',     emoji:'🌷', name:'鬱金香', cls:'tulip',    bloomEmoji:'🌷' },
-  { id:'lavender',  emoji:'💜', name:'薰衣草', cls:'lavender', bloomEmoji:'💜' },
-  { id:'plum',      emoji:'🌼', name:'梅花',   cls:'plum',     bloomEmoji:'🌼' },
-  { id:'peach',     emoji:'🍑', name:'桃花',   cls:'peach',    bloomEmoji:'🌸' },
-  { id:'daisy',     emoji:'🌸', name:'雛菊',   cls:'daisy',    bloomEmoji:'🌸' },
-  { id:'clover',    emoji:'☘️', name:'幸運草', cls:'clover',   bloomEmoji:'☘️' },
-  // ── 奇特類 ──
-  { id:'cactus',    emoji:'🌵', name:'仙人掌', cls:'cactus',   bloomEmoji:'🌵' },
-  { id:'mushroom',  emoji:'🍄', name:'蘑菇',   cls:'mushroom', bloomEmoji:'🍄' },
-  { id:'xmas',      emoji:'🎄', name:'聖誕樹', cls:'xmas',     bloomEmoji:'🎄' },
-  { id:'snowflake', emoji:'❄️', name:'雪松',   cls:'snowflake',bloomEmoji:'❄️' },
-  { id:'bonsai',    emoji:'🎋', name:'盆栽松', cls:'bonsai',   bloomEmoji:'🎋' },
-  { id:'mangrove',  emoji:'🌿', name:'紅樹林', cls:'mangrove', bloomEmoji:'🌿' },
-  { id:'reed',      emoji:'🌾', name:'蘆葦',   cls:'reed',     bloomEmoji:'🌾' },
-  { id:'willow',    emoji:'🍃', name:'柳樹',   cls:'willow',   bloomEmoji:'🍃' },
+  // ── L-System 7 種 ──
+  { id:'oak',    emoji:'🌳', name:'橡樹',   bloomEmoji:'🌳', lsystem:true },
+  { id:'sakura', emoji:'🌸', name:'櫻花',   bloomEmoji:'🌸', lsystem:true },
+  { id:'pine',   emoji:'🌲', name:'松樹',   bloomEmoji:'🌲', lsystem:true },
+  { id:'maple',  emoji:'🍁', name:'楓樹',   bloomEmoji:'🍂', lsystem:true },
+  { id:'plum',   emoji:'🌸', name:'梅花',   bloomEmoji:'🌸', lsystem:true },
+  { id:'rose',   emoji:'🌹', name:'玫瑰',   bloomEmoji:'🌹', lsystem:true },
+  { id:'vine',   emoji:'🍇', name:'葡萄藤', bloomEmoji:'🍇', lsystem:true },
+  // ── Canvas 5 種 ──
+  { id:'cactus',   emoji:'🌵', name:'仙人掌',   bloomEmoji:'🌵' },
+  { id:'mushroom', emoji:'🍄', name:'蘑菇',     bloomEmoji:'🍄' },
+  { id:'xmas',     emoji:'🎄', name:'聖誕樹',   bloomEmoji:'🎄' },
+  { id:'dandelion',emoji:'🌼', name:'蒲公英',   bloomEmoji:'🌼' },
+  { id:'bonsai',   emoji:'🎋', name:'楓樹盆栽', bloomEmoji:'🍁' },
 ];
 
 // ─────────────────────────────────────────
@@ -611,6 +972,8 @@ function buildPicker() {
       selTree = t;
       document.querySelectorAll('.picker-item').forEach(x=>x.classList.remove('selected'));
       d.classList.add('selected');
+      const cv2 = document.getElementById('treeCanvas');
+      if(cv2) cv2.style.filter = '';
       setEmojiStage(0, false);
     };
     wrap.appendChild(d);
@@ -656,26 +1019,54 @@ function getStageEmoji(stageIdx) {
   return stages[Math.min(stageIdx, stages.length-1)];
 }
 
+function isLSTree() { return !!(selTree && selTree.lsystem); }
+
+function _showCanvas(show) {
+  const cv = document.getElementById('treeCanvas');
+  const em = document.getElementById('treeEmojiDisplay');
+  if (!cv || !em) return;
+  if (show) {
+    cv.style.display = 'block';
+    em.style.display = 'none';
+  } else {
+    cv.style.display = 'none';
+    em.style.display = '';
+  }
+}
+
 function setEmojiStage(stageIdx, animate=true) {
+  currentStageIdx = stageIdx;
+  if (isLSTree()) {
+    _showCanvas(true);
+    // map stageIdx (0-4) → LS stage (0-3)
+    const lsStage = stageIdx <= 0 ? 0 : stageIdx <= 1 ? 1 : stageIdx <= 2 ? 2 : 3;
+    lsSetStage(selTree.id, lsStage, animate);
+    return;
+  }
+  _showCanvas(false);
   const el = document.getElementById('treeEmojiDisplay');
   if (!el) return;
   const emoji = getStageEmoji(stageIdx);
   const sizes = ['52px','62px','72px','80px','88px'];
-  // Only animate if emoji actually changes
   if (el.textContent !== emoji) {
     el.classList.remove('tree-grow-anim','tree-boom','tree-breathing');
     el.textContent = emoji;
     el.style.fontSize = sizes[stageIdx] || '80px';
-    void el.offsetWidth; // reflow
+    void el.offsetWidth;
     if (animate) el.classList.add('tree-grow-anim');
   } else {
     el.style.fontSize = sizes[stageIdx] || '80px';
   }
-  currentStageIdx = stageIdx;
 }
 
 function setStage(stageIdx) { setEmojiStage(stageIdx); }
 function setDeadStage() {
+  if (isLSTree()) {
+    // grey out canvas
+    const cv = document.getElementById('treeCanvas');
+    if (cv) { cv.style.filter = 'grayscale(0.7) brightness(0.8)'; }
+    return;
+  }
   const el = document.getElementById('treeEmojiDisplay');
   if (!el) return;
   el.classList.remove('tree-grow-anim','tree-boom','tree-breathing');
@@ -692,8 +1083,7 @@ function setMode(m) {
   if(isRunning) return;
   curMode = m;
   document.querySelectorAll('.mode-btn').forEach(b=>{
-    const val = parseInt(b.textContent);
-    b.classList.toggle('active', val===m);
+    b.classList.toggle('active', b.getAttribute('onclick')===`setMode(${m})`);
   });
   updateDisplay();
 }
@@ -718,6 +1108,8 @@ function startFocus() {
   startTimestamp = Date.now();
   isRunning = true;
 
+  const cv = document.getElementById('treeCanvas');
+  if(cv) cv.style.filter = '';
   setEmojiStage(0, false);
   const el = document.getElementById('treeEmojiDisplay');
   if(el){ el.style.filter=''; el.classList.remove('tree-breathing'); }
@@ -733,7 +1125,7 @@ function startFocus() {
     `<button class="btn btn-danger" onclick="giveUp()">放棄（樹枯死）</button>`;
 
   void el.offsetWidth;
-  el.classList.add('tree-breathing');
+  if(!selTree.lsystem) el.classList.add('tree-breathing');
   timerId = setInterval(tick, 1000);
   requestWakeLock();
 }
@@ -765,7 +1157,9 @@ function finishFocus() {
   const tEl = document.getElementById('treeEmojiDisplay');
   if(tEl){ tEl.classList.remove('tree-breathing'); }
   setEmojiStage(4);
-  if(tEl){ void tEl.offsetWidth; tEl.classList.add('tree-boom'); }
+  const cvEl = document.getElementById('treeCanvas');
+  if(cvEl) cvEl.style.filter = '';
+  if(tEl && !selTree.lsystem){ void tEl.offsetWidth; tEl.classList.add('tree-boom'); }
   // Petal burst
   burstPetals();
   const entry = {
