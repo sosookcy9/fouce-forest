@@ -1212,8 +1212,18 @@ function tick() {
   : prog < .50 ? 1
   : prog < .75 ? 2
   : 3;
-
- if (stageIdx !== currentStageIdx) setEmojiStage(stageIdx);
+if (stageIdx !== currentStageIdx) {
+  setEmojiStage(stageIdx);
+  const cvEl = document.getElementById('treeCanvas');
+  const tEl = document.getElementById('treeEmojiDisplay');
+  if (stageIdx === 3) {
+    if(cvEl) cvEl.style.filter = 'drop-shadow(0 0 10px #52b788) drop-shadow(0 0 20px #b7e4c7)';
+    if(tEl) tEl.style.filter = 'drop-shadow(0 0 10px #52b788) drop-shadow(0 0 20px #b7e4c7)';
+  } else {
+    if(cvEl) cvEl.style.filter = '';
+    if(tEl) tEl.style.filter = '';
+  }
+}
   const particles = ['🍃','🌿','✨','💨'];
   if(Math.random()<.06) spawnParticle(particles[Math.floor(Math.random()*particles.length)]);
   if(timeLeft<=0) finishFocus();
