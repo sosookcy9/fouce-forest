@@ -577,8 +577,12 @@ function finishFocus() {
   overlayEmojiEl.textContent = selTree.emojis[4]||selTree.emoji;
   const gc = selTree.glow || '#52b788';
   const gcFade = gc + '88';
-  overlayEmojiEl.style.filter = `drop-shadow(0 0 14px ${gc}) drop-shadow(0 0 30px ${gcFade})`;
-  overlayEmojiEl.style.animation = 'pop .5s cubic-bezier(.175,.885,.32,1.275) both';
+  // inject dynamic glow keyframes for this tree's color
+  let styleTag = document.getElementById('dynamicGlow');
+  if (!styleTag) { styleTag = document.createElement('style'); styleTag.id='dynamicGlow'; document.head.appendChild(styleTag); }
+  styleTag.textContent = `@keyframes treeGlow{0%,100%{filter:drop-shadow(0 0 8px ${gc}) drop-shadow(0 0 18px ${gcFade});}50%{filter:drop-shadow(0 0 16px ${gc}) drop-shadow(0 0 32px ${gcFade});}}`;
+  overlayEmojiEl.style.filter = '';
+  overlayEmojiEl.style.animation = 'pop .5s cubic-bezier(.175,.885,.32,1.275) both, treeGlow 2.5s ease-in-out .5s infinite';
   document.getElementById('overlay').style.display='flex';
 }
 
