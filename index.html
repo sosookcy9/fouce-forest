@@ -1678,20 +1678,26 @@ if (window.location.hash && window.location.hash.includes('type=recovery')) {
   isRecoveryMode = true;
 
   if (tokenHash) {
-    // 用 token_hash 驗證
+    // 先直接顯示重設介面，verifyOtp 在背景跑
+    showResetPasswordUI();
     sb.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' })
       .then(({ error }) => {
-        if (!error) showResetPasswordUI();
-        else { isRecoveryMode = false; console.error('verifyOtp error:', error); }
+        if (error) {
+          const msg = document.getElementById('authMsg');
+          msg.className = 'auth-msg';
+          msg.textContent = '連結驗證失敗，請重新申請：' + error.message;
+        }
       });
   } else if (accessToken) {
-    // 舊版 access_token 方式
     const refreshToken = hashParams.get('refresh_token') || '';
     sb.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
       .then(({ error }) => {
         if (!error) showResetPasswordUI();
         else { isRecoveryMode = false; }
       });
+  } else {
+    // 沒有 token 也直接顯示（讓用戶看到介面）
+    showResetPasswordUI();
   }
 }
 
