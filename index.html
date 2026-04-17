@@ -601,7 +601,7 @@ function drawLS_oak(stage, animate){
         lsCtx.arc(t.x+ox,t.y+oy,r,0,Math.PI*2);lsCtx.fillStyle=cols[Math.floor(Math.random()*3)];lsCtx.fill();lsCtx.restore();
       }
     });
-    if(stage===3){
+    if(stage===4){
       sh.slice(0,Math.ceil(sh.length*.4)).forEach(t=>{
         lsCtx.save();lsCtx.globalAlpha=.25;lsCtx.beginPath();
         lsCtx.arc(t.x+(Math.random()-.5)*5,t.y+(Math.random()-.5)*5,7+Math.random()*6,0,Math.PI*2);
