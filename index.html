@@ -1671,19 +1671,27 @@ function showResetPasswordUI() {
 }
 
 if (window.location.hash && window.location.hash.includes('type=recovery')) {
-  // 從 hash 取出 access_token 建立 session
   const hashParams = new URLSearchParams(window.location.hash.slice(1));
+  const tokenHash = hashParams.get('token_hash');
   const accessToken = hashParams.get('access_token');
-  const refreshToken = hashParams.get('refresh_token') || '';
-  if (accessToken) {
-    isRecoveryMode = true;
+
+  isRecoveryMode = true;
+
+  if (tokenHash) {
+    // 用 token_hash 驗證
+    sb.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' })
+      .then(({ error }) => {
+        if (!error) showResetPasswordUI();
+        else { isRecoveryMode = false; console.error('verifyOtp error:', error); }
+      });
+  } else if (accessToken) {
+    // 舊版 access_token 方式
+    const refreshToken = hashParams.get('refresh_token') || '';
     sb.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
       .then(({ error }) => {
         if (!error) showResetPasswordUI();
         else { isRecoveryMode = false; }
       });
-  } else {
-    showResetPasswordUI();
   }
 }
 
