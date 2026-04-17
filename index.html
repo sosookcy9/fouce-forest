@@ -1110,7 +1110,7 @@ function setEmojiStage(stageIdx, animate=true) {
   if (isLSTree()) {
     _showCanvas(true);
     // map stageIdx (0-4) → LS stage (0-3)
-    const lsStage = stageIdx <= 0 ? 0 : stageIdx <= 1 ? 1 : stageIdx <= 2 ? 2 : 3;
+    const lsStage = stageIdx <= 0 ? 0 : stageIdx <= 1 ? 1 : stageIdx <= 2 ? 2 : stageIdx <= 3 ? 3 : 4;
     lsSetStage(selTree.id, lsStage, animate);
     return;
   }
