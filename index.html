@@ -1558,8 +1558,42 @@ document.addEventListener('visibilitychange', () => {
 // ─────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────
+let isRecoveryMode = !!(window.location.hash && window.location.hash.includes('type=recovery'));
+
+function showResetPasswordUI() {
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('authSubtitle').textContent = '請設定新密碼';
+  document.getElementById('authEmail').style.display = 'none';
+  document.getElementById('authToggle').style.display = 'none';
+  document.querySelector('.auth-btn').textContent = '確認新密碼';
+  document.querySelector('.auth-btn').onclick = async () => {
+    const newPassword = document.getElementById('authPassword').value;
+    const msg = document.getElementById('authMsg');
+    if (!newPassword || newPassword.length < 6) {
+      msg.className = 'auth-msg'; msg.textContent = '密碼至少需要6位'; return;
+    }
+    msg.className = 'auth-msg ok'; msg.textContent = '更新中...';
+    const { error } = await sb.auth.updateUser({ password: newPassword });
+    if (error) { msg.className = 'auth-msg'; msg.textContent = '更新失敗：' + error.message; }
+    else {
+      msg.className = 'auth-msg ok'; msg.textContent = '✅ 密碼已更新，請重新登入';
+      setTimeout(() => {
+        isRecoveryMode = false;
+        window.location.hash = '';
+        document.getElementById('authEmail').style.display = 'block';
+        document.getElementById('authToggle').style.display = 'block';
+        document.querySelector('.auth-btn').textContent = '登入';
+        document.querySelector('.auth-btn').onclick = authSubmit;
+        document.getElementById('authSubtitle').textContent = '登入以同步你的森林紀錄';
+        document.getElementById('authPassword').value = '';
+        document.getElementById('authMsg').textContent = '';
+      }, 2000);
+    }
+  };
+}
+
 async function initApp(session) {
-  if (isRecoveryMode) return; // recovery 模式不初始化 app
+  if (isRecoveryMode) return;
   if (!session) {
     document.getElementById('authScreen').style.display = 'flex';
     return;
@@ -1567,7 +1601,6 @@ async function initApp(session) {
   currentUser = session.user;
   document.getElementById('authScreen').style.display = 'none';
   await loadFromSupabase();
-  // migrate local data if any
   const local = JSON.parse(localStorage.getItem('fg_garden2') || '[]');
   if (local.length > 0 && garden.length === 0) {
     for (const entry of local) { await saveToSupabase(entry); }
@@ -1588,39 +1621,24 @@ async function initApp(session) {
   renderStats();
 }
 
+// recovery 模式：先顯示重設介面，再背景驗證
+if (isRecoveryMode) {
+  const hashParams = new URLSearchParams(window.location.hash.slice(1));
+  const tokenHash = hashParams.get('token_hash');
+  showResetPasswordUI();
+  if (tokenHash) {
+    sb.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' })
+      .then(({ error }) => {
+        if (error) {
+          document.getElementById('authMsg').className = 'auth-msg';
+          document.getElementById('authMsg').textContent = '連結已失效，請重新申請';
+        }
+      });
+  }
+}
+
 sb.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN' && !isRecoveryMode) initApp(session);
-  if (event === 'PASSWORD_RECOVERY') {
-    // 顯示重設密碼介面
-    document.getElementById('authScreen').style.display = 'flex';
-    document.getElementById('authSubtitle').textContent = '請設定新密碼';
-    document.getElementById('authEmail').style.display = 'none';
-    document.getElementById('authToggle').style.display = 'none';
-    document.querySelector('.auth-btn').textContent = '確認新密碼';
-    document.querySelector('.auth-btn').onclick = async () => {
-      const newPassword = document.getElementById('authPassword').value;
-      const msg = document.getElementById('authMsg');
-      if (!newPassword || newPassword.length < 6) {
-        msg.className = 'auth-msg'; msg.textContent = '密碼至少需要6位'; return;
-      }
-      msg.className = 'auth-msg ok'; msg.textContent = '更新中...';
-      const { error } = await sb.auth.updateUser({ password: newPassword });
-      if (error) { msg.className = 'auth-msg'; msg.textContent = '更新失敗：' + error.message; }
-      else {
-        msg.className = 'auth-msg ok'; msg.textContent = '✅ 密碼已更新！';
-        // 還原登入介面
-        setTimeout(() => {
-          document.getElementById('authEmail').style.display = 'block';
-          document.getElementById('authToggle').style.display = 'block';
-          document.querySelector('.auth-btn').textContent = '登入';
-          document.querySelector('.auth-btn').onclick = authSubmit;
-          document.getElementById('authSubtitle').textContent = '登入以同步你的森林紀錄';
-          document.getElementById('authPassword').value = '';
-          msg.textContent = '請重新登入';
-        }, 2000);
-      }
-    };
-  }
   if (event === 'SIGNED_OUT') {
     currentUser = null;
     garden = [];
@@ -1636,70 +1654,6 @@ sb.auth.getSession().then(({ data: { session } }) => {
   initApp(session);
 });
 
-// 處理從信箱連結跳回來的情況（忘記密碼）
-let isRecoveryMode = false;
-
-function showResetPasswordUI() {
-  document.getElementById('authScreen').style.display = 'flex';
-  document.getElementById('authSubtitle').textContent = '請設定新密碼';
-  document.getElementById('authEmail').style.display = 'none';
-  document.getElementById('authToggle').style.display = 'none';
-  document.querySelector('.auth-btn').textContent = '確認新密碼';
-  document.querySelector('.auth-btn').onclick = async () => {
-    const newPassword = document.getElementById('authPassword').value;
-    const msg = document.getElementById('authMsg');
-    if (!newPassword || newPassword.length < 6) {
-      msg.className = 'auth-msg'; msg.textContent = '密碼至少需要6位'; return;
-    }
-    msg.className = 'auth-msg ok'; msg.textContent = '更新中...';
-    const { error } = await sb.auth.updateUser({ password: newPassword });
-    if (error) { msg.className = 'auth-msg'; msg.textContent = '更新失敗：' + error.message; }
-    else {
-      msg.className = 'auth-msg ok'; msg.textContent = '✅ 密碼已更新，請重新登入';
-      setTimeout(() => {
-        document.getElementById('authEmail').style.display = 'block';
-        document.getElementById('authToggle').style.display = 'block';
-        document.querySelector('.auth-btn').textContent = '登入';
-        document.querySelector('.auth-btn').onclick = authSubmit;
-        document.getElementById('authSubtitle').textContent = '登入以同步你的森林紀錄';
-        document.getElementById('authPassword').value = '';
-        msg.textContent = '';
-        window.location.hash = '';
-      }, 2000);
-    }
-  };
-}
-
-if (window.location.hash && window.location.hash.includes('type=recovery')) {
-  const hashParams = new URLSearchParams(window.location.hash.slice(1));
-  const tokenHash = hashParams.get('token_hash');
-  const accessToken = hashParams.get('access_token');
-
-  isRecoveryMode = true;
-
-  if (tokenHash) {
-    // 先直接顯示重設介面，verifyOtp 在背景跑
-    showResetPasswordUI();
-    sb.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' })
-      .then(({ error }) => {
-        if (error) {
-          const msg = document.getElementById('authMsg');
-          msg.className = 'auth-msg';
-          msg.textContent = '連結驗證失敗，請重新申請：' + error.message;
-        }
-      });
-  } else if (accessToken) {
-    const refreshToken = hashParams.get('refresh_token') || '';
-    sb.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-      .then(({ error }) => {
-        if (!error) showResetPasswordUI();
-        else { isRecoveryMode = false; }
-      });
-  } else {
-    // 沒有 token 也直接顯示（讓用戶看到介面）
-    showResetPasswordUI();
-  }
-}
 
 buildPicker();
 
