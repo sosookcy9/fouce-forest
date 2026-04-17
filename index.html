@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+i<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -1228,11 +1228,9 @@ if (stageIdx !== currentStageIdx) {
   if(Math.random()<.06) spawnParticle(particles[Math.floor(Math.random()*particles.length)]);
   if(timeLeft<=0) finishFocus();
 }
-
 function setRing(ratio) {
   document.getElementById('ringFill').style.strokeDashoffset = CIRC*(1-ratio);
 }
-
 function finishFocus() {
   clearInterval(timerId); isRunning=false;
   releaseWakeLock();
@@ -1244,6 +1242,8 @@ function finishFocus() {
   if(tEl && !selTree.lsystem){ 
   void tEl.offsetWidth; 
   tEl.classList.add('tree-boom');
+  tEl.style.filter = 'drop-shadow(0 0 12px #52b788) drop-shadow(0 0 24px #b7e4c7)';
+}
   tEl.style.filter = 'drop-shadow(0 0 12px #52b788) drop-shadow(0 0 24px #b7e4c7)';
 }
   // Petal burst
