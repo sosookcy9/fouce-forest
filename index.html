@@ -1208,12 +1208,12 @@ function tick() {
   showTime(timeLeft);
   const prog = elapsed / totalTime;
   setRing(Math.min(prog, 1));
-  const stageIdx = prog < .15 ? 0
-    : prog < .35 ? 1
-    : prog < .60 ? 2
-    : prog < .85 ? 3
-    : 3;
-  if (stageIdx !== currentStageIdx) setEmojiStage(stageIdx);
+  const stageIdx = prog < .25 ? 0
+  : prog < .50 ? 1
+  : prog < .75 ? 2
+  : 3;
+
+ if (stageIdx !== currentStageIdx) setEmojiStage(stageIdx);
   const particles = ['🍃','🌿','✨','💨'];
   if(Math.random()<.06) spawnParticle(particles[Math.floor(Math.random()*particles.length)]);
   if(timeLeft<=0) finishFocus();
