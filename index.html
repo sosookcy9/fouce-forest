@@ -473,7 +473,7 @@ function setMode(m) {
   showTime(curMode*60);
 }
 
-let customMinutes = 45;
+let customMinutes = 25;
 
 function openCustomModal() {
   if(isRunning) return;
@@ -485,7 +485,7 @@ function openCustomModal() {
       <div class="custom-modal-title">自訂時間</div>
       <div class="custom-modal-val" id="customValDisplay">${customMinutes}</div>
       <div class="custom-modal-unit">分鐘</div>
-      <input class="custom-slider" type="range" min="1" max="90" value="${customMinutes}" id="customSlider"
+      <input class="custom-slider" type="range" min="5" max="90" value="${customMinutes}" id="customSlider"
         oninput="document.getElementById('customValDisplay').textContent=this.value">
       <div class="custom-modal-btns">
         <button class="custom-cancel" onclick="closeCustomModal()">取消</button>
@@ -875,10 +875,6 @@ sb.auth.onAuthStateChange((event,session)=>{
 });
 
 sb.auth.getSession().then(({data:{session}})=>{initApp(session);});
-
-buildPicker();
-setStageDisplay(0,false);
-showTime(curMode*60);
 
 // drag-to-scroll picker
 (function(){
