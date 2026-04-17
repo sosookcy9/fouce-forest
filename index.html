@@ -192,10 +192,10 @@ nav{width:100%;display:flex;justify-content:space-between;align-items:center;pad
 <!-- TIMER -->
 <div class="screen active" id="timerScreen">
   <div class="mode-row" id="modeRow">
-    <button class="mode-btn active" onclick="setMode(25)">25'</button>
-    <button class="mode-btn" onclick="setMode(30)">30'</button>
-    <button class="mode-btn" onclick="setMode(35)">35'</button>
-    <button class="mode-btn" onclick="setMode(40)">40'</button>
+    <button class="mode-btn active" onclick="setMode(25)">25</button>
+    <button class="mode-btn" onclick="setMode(30)">30</button>
+    <button class="mode-btn" onclick="setMode(35)">35</button>
+    <button class="mode-btn" onclick="setMode(40)">40</button>
     <button class="mode-btn" onclick="setMode(0.167)" style="color:var(--red);border-color:rgba(193,68,14,.4);font-size:.72rem;">10s</button>
   </div>
   <div class="ring-wrap">
@@ -211,12 +211,12 @@ nav{width:100%;display:flex;justify-content:space-between;align-items:center;pad
   <div class="timer-below">
     <div class="timer-num" id="timerNum">25:00</div>
   </div>
+  <div class="btn-row" id="btnRow">
+    <button class="btn btn-primary" onclick="startFocus()">🌱 開始種植</button>
+  </div>
   <div class="status-msg" id="statusMsg">選好樹種，種下你的專注</div>
   <div class="picker-scroll-wrap" id="pickerScrollWrap">
     <div class="tree-picker" id="treePicker"></div>
-  </div>
-  <div class="btn-row" id="btnRow">
-    <button class="btn btn-primary" onclick="startFocus()">🌱 開始種植</button>
   </div>
 </div>
 
@@ -288,18 +288,18 @@ drawSoil();
 // emojis: [stage0(土地), stage1(發芽), stage2(小), stage3(中), stage4(完成)]
 // stage0 = empty, soil canvas handles it
 const TREES = [
-  { id:'oak',      emoji:'🌳', name:'橡樹',   emojis:['','🌱','🌿','🌳','🌳'] },
-  { id:'sakura',   emoji:'🌸', name:'櫻花',   emojis:['','🌱','🌿','🌸','🌸'] },
-  { id:'pine',     emoji:'🌲', name:'松樹',   emojis:['','🌱','🌿','🌲','🌲'] },
-  { id:'clover',   emoji:'🍀', name:'四葉草', emojis:['','🌱','🌿','☘️','🍀'] },
-  { id:'rose',     emoji:'🌹', name:'玫瑰',   emojis:['','🌱','🌿','🥀','🌹'] },
-  { id:'vine',     emoji:'🍇', name:'葡萄藤', emojis:['','🌱','🌿','🍃','🍇'] },
-  { id:'cactus',   emoji:'🌵', name:'仙人掌', emojis:['','🌱','🌵','🌵','🌵'] },
-  { id:'mushroom', emoji:'🍄', name:'蘑菇',   emojis:['','🌱','🍄','🍄','🍄'] },
-  { id:'xmas',     emoji:'🎄', name:'聖誕樹', emojis:['','🌱','🌲','🎄','🎄'] },
-  { id:'bamboo',   emoji:'🎋', name:'竹子',   emojis:['','🌱','🌿','🎍','🎋'] },
-  { id:'sunflower',emoji:'🌻', name:'向日葵', emojis:['','🌱','🌿','🌻','🌻'] },
-  { id:'palm',     emoji:'🌴', name:'椰子樹', emojis:['','🌱','🌿','🌴','🌴'] },
+  { id:'oak',      emoji:'🌳', name:'橡樹',   emojis:['','🌱','🪴','🌳','🌳'] },
+  { id:'sakura',   emoji:'🌸', name:'櫻花',   emojis:['','🌱','🪴','🌸','🌸'] },
+  { id:'pine',     emoji:'🌲', name:'松樹',   emojis:['','🌱','🪴','🌲','🌲'] },
+  { id:'clover',   emoji:'🍀', name:'四葉草', emojis:['','🌱','🪴','☘️','🍀'] },
+  { id:'rose',     emoji:'🌹', name:'玫瑰',   emojis:['','🌱','🪴','🌷','🌹'] },
+  { id:'vine',     emoji:'🍇', name:'葡萄藤', emojis:['','🌱','🪴','🍃','🍇'] },
+  { id:'cactus',   emoji:'🌵', name:'仙人掌', emojis:['','🌱','🪴','🌵','🌵'] },
+  { id:'mushroom', emoji:'🍄', name:'蘑菇',   emojis:['','🌱','🪴','🍄','🍄'] },
+  { id:'xmas',     emoji:'🎄', name:'聖誕樹', emojis:['','🌱','🪴','🎄','🎄'] },
+  { id:'bamboo',   emoji:'🎋', name:'竹子',   emojis:['','🌱','🪴','🎍','🎋'] },
+  { id:'sunflower',emoji:'🌻', name:'向日葵', emojis:['','🌱','🪴','🌻','🌻'] },
+  { id:'palm',     emoji:'🌴', name:'椰子樹', emojis:['','🌱','🪴','🌴','🌴'] },
 ];
 
 // font sizes per stage
