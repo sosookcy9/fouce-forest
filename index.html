@@ -1239,13 +1239,11 @@ function finishFocus() {
   setEmojiStage(4);
   const cvEl = document.getElementById('treeCanvas');
   if(cvEl) cvEl.style.filter = 'drop-shadow(0 0 12px #52b788) drop-shadow(0 0 24px #b7e4c7)';
-  if(tEl && !selTree.lsystem){ 
-  void tEl.offsetWidth; 
-  tEl.classList.add('tree-boom');
-  tEl.style.filter = 'drop-shadow(0 0 12px #52b788) drop-shadow(0 0 24px #b7e4c7)';
-}
-  tEl.style.filter = 'drop-shadow(0 0 12px #52b788) drop-shadow(0 0 24px #b7e4c7)';
-}
+    if(tEl && !selTree.lsystem){ 
+    void tEl.offsetWidth; 
+    tEl.classList.add('tree-boom');
+  }
+  if(tEl) tEl.style.filter = 'drop-shadow(0 0 12px #52b788) drop-shadow(0 0 24px #b7e4c7)';
   // Petal burst
   burstPetals();
   const entry = {
