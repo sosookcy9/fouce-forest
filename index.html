@@ -49,6 +49,21 @@ nav{width:100%;display:flex;justify-content:space-between;align-items:center;pad
 .mode-btn.active{background:var(--green-mid);color:#fff;border-color:var(--green-mid);}
 .mode-btn:hover:not(.active){border-color:var(--green-light);background:#fff;}
 
+/* ── CUSTOM TIME MODAL ── */
+.custom-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:400;display:flex;align-items:center;justify-content:center;}
+.custom-modal{background:#fff;border-radius:var(--radius-md);padding:28px 24px 22px;width:88%;max-width:320px;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:var(--shadow-md);}
+.custom-modal-title{font-size:.78rem;color:var(--green-light);letter-spacing:.08em;text-transform:uppercase;font-weight:400;}
+.custom-modal-val{font-family:'Lora',serif;font-size:2.6rem;font-weight:600;color:var(--green-deep);line-height:1;}
+.custom-modal-unit{font-size:.76rem;color:var(--green-mid);margin-top:-6px;}
+.custom-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:10px;background:var(--green-pale);outline:none;margin:8px 0;}
+.custom-slider::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:var(--green-deep);cursor:pointer;box-shadow:0 2px 8px rgba(27,67,50,.3);}
+.custom-slider::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:var(--green-deep);cursor:pointer;border:none;box-shadow:0 2px 8px rgba(27,67,50,.3);}
+.custom-modal-btns{display:flex;gap:10px;width:100%;margin-top:4px;}
+.custom-modal-btns button{flex:1;padding:11px;border-radius:var(--radius-pill);font-family:'Noto Serif TC',serif;font-size:.88rem;cursor:pointer;transition:all .2s;}
+.custom-cancel{background:transparent;border:1.5px solid var(--green-pale);color:var(--green-mid);}
+.custom-confirm{background:var(--green-deep);border:none;color:#fff;box-shadow:0 3px 10px rgba(27,67,50,.2);}
+.custom-confirm:hover{background:var(--green-mid);}
+
 .ring-wrap{position:relative;width:260px;height:260px;margin-bottom:8px;flex-shrink:0;}
 .ring-svg{width:260px;height:260px;transform:rotate(-90deg);}
 .ring-track{fill:none;stroke:rgba(255,255,255,.5);stroke-width:9;}
@@ -196,7 +211,7 @@ nav{width:100%;display:flex;justify-content:space-between;align-items:center;pad
     <button class="mode-btn" onclick="setMode(30)">30</button>
     <button class="mode-btn" onclick="setMode(35)">35</button>
     <button class="mode-btn" onclick="setMode(40)">40</button>
-    <button class="mode-btn" onclick="setMode(0.167)" style="color:var(--red);border-color:rgba(193,68,14,.4);font-size:.72rem;">10s</button>
+    <button class="mode-btn" id="customModeBtn" onclick="openCustomModal()">自訂</button>
   </div>
   <div class="ring-wrap">
     <svg class="ring-svg" viewBox="0 0 270 270">
@@ -288,18 +303,18 @@ drawSoil();
 // emojis: [stage0(土地), stage1(發芽), stage2(小), stage3(中), stage4(完成)]
 // stage0 = empty, soil canvas handles it
 const TREES = [
-  { id:'oak',      emoji:'🌳', name:'橡樹',   emojis:['','🌱','🪴','🌳','🌳'] },
-  { id:'sakura',   emoji:'🌸', name:'櫻花',   emojis:['','🌱','🪴','🌸','🌸'] },
-  { id:'pine',     emoji:'🌲', name:'松樹',   emojis:['','🌱','🪴','🌲','🌲'] },
-  { id:'clover',   emoji:'🍀', name:'四葉草', emojis:['','🌱','🪴','☘️','🍀'] },
-  { id:'rose',     emoji:'🌹', name:'玫瑰',   emojis:['','🌱','🪴','🌷','🌹'] },
-  { id:'vine',     emoji:'🍇', name:'葡萄藤', emojis:['','🌱','🪴','🍃','🍇'] },
-  { id:'cactus',   emoji:'🌵', name:'仙人掌', emojis:['','🌱','🪴','🌵','🌵'] },
-  { id:'mushroom', emoji:'🍄', name:'蘑菇',   emojis:['','🌱','🪴','🍄','🍄'] },
-  { id:'xmas',     emoji:'🎄', name:'聖誕樹', emojis:['','🌱','🪴','🎄','🎄'] },
-  { id:'bamboo',   emoji:'🎋', name:'竹子',   emojis:['','🌱','🪴','🎍','🎋'] },
-  { id:'sunflower',emoji:'🌻', name:'向日葵', emojis:['','🌱','🪴','🌻','🌻'] },
-  { id:'palm',     emoji:'🌴', name:'椰子樹', emojis:['','🌱','🪴','🌴','🌴'] },
+  { id:'oak',      emoji:'🌳', name:'橡樹',   emojis:['','🌱','🪴','🌳','🌳'], glow:'#52b788' },
+  { id:'sakura',   emoji:'🌸', name:'櫻花',   emojis:['','🌱','🪴','🌸','🌸'], glow:'#f9a8d4' },
+  { id:'pine',     emoji:'🌲', name:'松樹',   emojis:['','🌱','🪴','🌲','🌲'], glow:'#52b788' },
+  { id:'clover',   emoji:'🍀', name:'四葉草', emojis:['','🌱','🪴','☘️','🍀'], glow:'#52b788' },
+  { id:'rose',     emoji:'🌹', name:'玫瑰',   emojis:['','🌱','🪴','🌷','🌹'], glow:'#f87171' },
+  { id:'vine',     emoji:'🍇', name:'葡萄藤', emojis:['','🌱','🪴','🍃','🍇'], glow:'#c084fc' },
+  { id:'cactus',   emoji:'🌵', name:'仙人掌', emojis:['','🌱','🪴','🌵','🌵'], glow:'#52b788' },
+  { id:'mushroom', emoji:'🍄', name:'蘑菇',   emojis:['','🌱','🪴','🍄','🍄'], glow:'#fb923c' },
+  { id:'xmas',     emoji:'🎄', name:'聖誕樹', emojis:['','🌱','🪴','🎄','🎄'], glow:'#e2e8f0' },
+  { id:'bamboo',   emoji:'🎋', name:'竹子',   emojis:['','🌱','🪴','🎍','🎋'], glow:'#52b788' },
+  { id:'sunflower',emoji:'🌻', name:'向日葵', emojis:['','🌱','🪴','🌻','🌻'], glow:'#fbbf24' },
+  { id:'palm',     emoji:'🌴', name:'椰子樹', emojis:['','🌱','🪴','🌴','🌴'], glow:'#52b788' },
 ];
 
 // font sizes per stage
@@ -410,6 +425,8 @@ function setStageDisplay(stageIdx, animate=true) {
   const el = document.getElementById('treeEmojiDisplay');
   if (!el) return;
   const emoji = selTree.emojis[stageIdx] || '';
+  const gc = selTree.glow || '#52b788';
+  const gcFade = gc + '88';
   el.classList.remove('tree-grow-anim','tree-boom','tree-breathing','tree-glow');
   el.style.filter = '';
   el.style.fontSize = STAGE_FS[stageIdx];
@@ -419,9 +436,13 @@ function setStageDisplay(stageIdx, animate=true) {
     if (animate && stageIdx > 0) el.classList.add('tree-grow-anim');
   }
   if (stageIdx === 3) {
-    el.style.filter = 'drop-shadow(0 0 10px #52b788) drop-shadow(0 0 20px #b7e4c7)';
+    el.style.filter = `drop-shadow(0 0 10px ${gc}) drop-shadow(0 0 20px ${gcFade})`;
   }
   if (stageIdx === 4) {
+    // inject dynamic keyframes for this tree's glow color
+    let styleTag = document.getElementById('dynamicGlow');
+    if (!styleTag) { styleTag = document.createElement('style'); styleTag.id='dynamicGlow'; document.head.appendChild(styleTag); }
+    styleTag.textContent = `@keyframes treeGlow{0%,100%{filter:drop-shadow(0 0 8px ${gc}) drop-shadow(0 0 18px ${gcFade});}50%{filter:drop-shadow(0 0 16px ${gc}) drop-shadow(0 0 32px ${gcFade});}}`;
     el.classList.add('tree-glow');
   }
 }
@@ -445,6 +466,46 @@ function setMode(m) {
     b.classList.toggle('active', b.getAttribute('onclick')===`setMode(${m})`);
   });
   showTime(curMode*60);
+}
+
+let customMinutes = 45;
+
+function openCustomModal() {
+  if(isRunning) return;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'custom-modal-backdrop';
+  backdrop.id = 'customModalBackdrop';
+  backdrop.innerHTML = `
+    <div class="custom-modal">
+      <div class="custom-modal-title">自訂時間</div>
+      <div class="custom-modal-val" id="customValDisplay">${customMinutes}</div>
+      <div class="custom-modal-unit">分鐘</div>
+      <input class="custom-slider" type="range" min="1" max="90" value="${customMinutes}" id="customSlider"
+        oninput="document.getElementById('customValDisplay').textContent=this.value">
+      <div class="custom-modal-btns">
+        <button class="custom-cancel" onclick="closeCustomModal()">取消</button>
+        <button class="custom-confirm" onclick="confirmCustomTime()">確認</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+  backdrop.addEventListener('click', e=>{ if(e.target===backdrop) closeCustomModal(); });
+}
+
+function closeCustomModal() {
+  const el = document.getElementById('customModalBackdrop');
+  if(el) el.remove();
+}
+
+function confirmCustomTime() {
+  const val = parseInt(document.getElementById('customSlider').value);
+  customMinutes = val;
+  closeCustomModal();
+  curMode = val;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  const btn = document.getElementById('customModeBtn');
+  btn.classList.add('active');
+  btn.textContent = val;
+  showTime(val*60);
 }
 
 function showTime(s) {
@@ -567,6 +628,9 @@ function resetUI() {
   const el=document.getElementById('treeEmojiDisplay');
   if(el){ el.classList.remove('tree-breathing','tree-boom','tree-grow-anim','tree-glow'); el.style.filter=''; }
   document.getElementById('btnRow').innerHTML=`<button class="btn btn-primary" onclick="startFocus()">🌱 開始種植</button>`;
+  // restore custom button label
+  const customBtn = document.getElementById('customModeBtn');
+  if(customBtn) customBtn.textContent = '自訂';
   showTime(curMode*60);
   go('timer');
 }
