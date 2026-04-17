@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>森林時光</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1b4332">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="森林時光">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600&family=Lora:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -34,7 +39,7 @@ body{font-family:'Noto Serif TC',serif;background:var(--bg);min-height:100vh;dis
 /* ── NAV ── */
 .logout-btn{padding:4px 10px;border-radius:var(--radius-pill);border:1.5px solid var(--green-pale);background:transparent;font-family:'Noto Serif TC',serif;font-size:.68rem;color:var(--green-mid);cursor:pointer;}
 nav{width:100%;display:flex;justify-content:space-between;align-items:center;padding:14px 20px;position:sticky;top:0;z-index:50;background:rgba(237,247,240,.92);backdrop-filter:blur(10px);border-bottom:1px solid rgba(183,228,199,.4);}
-.logo{font-size:.95rem;font-weight:600;letter-spacing:.04em;color:var(--green-deep);}
+.logo{font-size:1.1rem;font-weight:600;letter-spacing:.04em;color:var(--green-deep);}
 .nav-tabs{display:flex;gap:3px;background:rgba(255,255,255,.65);border-radius:var(--radius-pill);padding:3px;}
 .nav-tab{padding:6px 16px;border-radius:var(--radius-pill);border:none;background:transparent;font-family:'Noto Serif TC',serif;font-size:.76rem;color:var(--green-mid);cursor:pointer;transition:all .22s;white-space:nowrap;}
 .nav-tab.active{background:var(--green-deep);color:#fff;box-shadow:0 2px 8px rgba(27,67,50,.2);}
@@ -568,7 +573,12 @@ function finishFocus() {
   for(let i=0;i<10;i++) setTimeout(()=>spawnParticle(['🌸','🌺','🍀','✨','🌿'][Math.floor(Math.random()*5)]),i*100);
 
   document.getElementById('overlaySub').textContent=`${entry.mins} 分鐘的 ${entry.name} 已種進森林！`;
-  document.getElementById('overlayEmoji').textContent=selTree.emojis[4]||selTree.emoji;
+  const overlayEmojiEl = document.getElementById('overlayEmoji');
+  overlayEmojiEl.textContent = selTree.emojis[4]||selTree.emoji;
+  const gc = selTree.glow || '#52b788';
+  const gcFade = gc + '88';
+  overlayEmojiEl.style.filter = `drop-shadow(0 0 14px ${gc}) drop-shadow(0 0 30px ${gcFade})`;
+  overlayEmojiEl.style.animation = 'pop .5s cubic-bezier(.175,.885,.32,1.275) both';
   document.getElementById('overlay').style.display='flex';
 }
 
@@ -875,6 +885,13 @@ showTime(curMode*60);
   wrap.addEventListener('mouseup',()=>isDown=false);
   wrap.addEventListener('mousemove',e=>{if(!isDown)return;e.preventDefault();const x=e.pageX-wrap.offsetLeft;wrap.scrollLeft=scrollLeft-(x-startX);});
 })();
+
+// ── PWA SERVICE WORKER ──
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
